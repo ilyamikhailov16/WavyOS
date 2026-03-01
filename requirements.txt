@@ -1,0 +1,3 @@
+keyboard==0.13.5
+pywin32==311
+Send2Trash==2.1.0
