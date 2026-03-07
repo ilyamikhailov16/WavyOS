@@ -1,5 +1,7 @@
 # WavyOS
 
+![image](./src/images/mascot.jpg)
+
 1. [Project Description](#project_desc)
 2. [Usage guide](#usage_guide)
 
