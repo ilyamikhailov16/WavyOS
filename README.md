@@ -3,6 +3,10 @@
 1. [Project Description](#project_desc)
 2. [Usage guide](#usage_guide)
 
+| ![mascot.png](./src/images/mascot.png) | 
+|:--:| 
+| *Wavy* |
+
 ## Project Description <a id="project_desc"></a>
 An assistant that combines deep automation of routine tasks (file system, scripts) and emotional interaction through a visualized avatar.
 
