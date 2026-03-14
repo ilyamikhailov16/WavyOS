@@ -1,15 +1,14 @@
 import os
 import pathlib
-import logging
 import textwrap
 import subprocess
 import sys
 import keyboard
 
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
 from bootstrap import settings
+from app_logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_script(

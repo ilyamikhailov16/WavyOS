@@ -1,4 +1,3 @@
-import logging
 import os
 import pathlib
 
@@ -7,12 +6,10 @@ import send2trash
 import win32com.shell.shell as shell
 
 from bootstrap import settings
-
-
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+from app_logging import get_logger
 
 TRASH_TOOL_SETTINGS = settings.trash_tool
+logger = get_logger(__name__)
 
 
 def clear_folder(folder_path: str | os.PathLike) -> None:

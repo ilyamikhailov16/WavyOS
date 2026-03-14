@@ -1,7 +1,6 @@
 """Windows energy saver and display refresh-rate helpers."""
 
 import ctypes
-import logging
 import subprocess
 from ctypes import wintypes
 from pathlib import Path
@@ -9,13 +8,11 @@ from pathlib import Path
 import keyboard
 
 from bootstrap import settings
-
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+from app_logging import get_logger
 
 ENERGY_SAVER_SETTINGS = settings.energy_saver
 user32 = ctypes.windll.user32
+logger = get_logger(__name__)
 
 
 class DEVMODE(ctypes.Structure):

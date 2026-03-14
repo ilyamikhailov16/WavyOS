@@ -1,6 +1,5 @@
 import argparse
 import asyncio
-import logging
 import subprocess
 from pathlib import Path
 import time
@@ -15,17 +14,15 @@ import win32process
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
-
 from bootstrap import settings
+from app_logging import get_logger
 
 BROWSER_SETTINGS = settings.browser
 PRESETS = BROWSER_SETTINGS.presets
 PROCESS_NAMES = BROWSER_SETTINGS.process_names
 DEFAULT_TIMEOUT_MS = BROWSER_SETTINGS.timeouts.default_timeout_ms
 DEFAULT_WAIT_AFTER_MS = BROWSER_SETTINGS.timeouts.default_wait_after_ms
+logger = get_logger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:

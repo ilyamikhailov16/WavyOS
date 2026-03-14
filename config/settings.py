@@ -304,6 +304,13 @@ class TrashToolSettings(BaseModel):
     paths: TrashToolPathsSettings = TrashToolPathsSettings()
 
 
+class LoggingSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    level: str = "INFO"
+    format: str = "%(levelname)s - %(message)s"
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -313,6 +320,7 @@ class Settings(BaseModel):
     energy_saver: EnergySaverSettings = EnergySaverSettings()
     system_toggle: SystemToggleSettings = SystemToggleSettings()
     trash_tool: TrashToolSettings = TrashToolSettings()
+    logging: LoggingSettings = LoggingSettings()
 
 
 settings = Settings()

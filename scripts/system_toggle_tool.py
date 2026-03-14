@@ -1,6 +1,5 @@
 """Toggle selected Windows system states and shell pages."""
 
-import logging
 import subprocess
 import time
 from pathlib import Path
@@ -11,12 +10,10 @@ import pythoncom
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
 from bootstrap import settings
-
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+from app_logging import get_logger
 
 SYSTEM_TOGGLE_SETTINGS = settings.system_toggle
+logger = get_logger(__name__)
 
 
 def toggle_mute() -> None:
