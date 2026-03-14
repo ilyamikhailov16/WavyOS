@@ -1,7 +1,6 @@
 import threading
 import time
 from pathlib import Path
-import sys
 
 import cv2
 import numpy as np
@@ -9,11 +8,7 @@ import mss
 import keyboard
 import pyautogui
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
-from config import settings
+from bootstrap import settings
 
 SCREEN_TOOL_SETTINGS = settings.screen_tool
 OUT_DIR = Path.cwd() / SCREEN_TOOL_SETTINGS.paths.records_dir_name

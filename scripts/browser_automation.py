@@ -3,7 +3,6 @@ import asyncio
 import logging
 import subprocess
 from pathlib import Path
-import sys
 import time
 from urllib.parse import quote_plus
 import winreg
@@ -20,11 +19,7 @@ from playwright.async_api import async_playwright
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
-from config import settings
+from bootstrap import settings
 
 BROWSER_SETTINGS = settings.browser
 PRESETS = BROWSER_SETTINGS.presets

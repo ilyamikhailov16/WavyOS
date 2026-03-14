@@ -3,17 +3,12 @@
 import ctypes
 import logging
 import subprocess
-import sys
 from ctypes import wintypes
 from pathlib import Path
 
 import keyboard
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
-from config import settings
+from bootstrap import settings
 
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")

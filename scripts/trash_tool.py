@@ -1,17 +1,12 @@
 import logging
 import os
 import pathlib
-import sys
 
 import keyboard
 import send2trash
 import win32com.shell.shell as shell
 
-BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
-
-from config import settings
+from bootstrap import settings
 
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
