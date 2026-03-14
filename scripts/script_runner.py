@@ -1,7 +1,6 @@
 import os
 import pathlib
 import logging
-
 import textwrap
 import subprocess
 import sys
@@ -9,6 +8,12 @@ import keyboard
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from config import settings
 
 
 def run_script(
@@ -60,7 +65,8 @@ def run_script(
 
 
 if __name__ == "__main__":
-    DUMMY_SCRIPT_NAME = "play_sound.py"
+    SCRIPT_RUNNER_SETTINGS = settings.script_runner
+    DUMMY_SCRIPT_NAME = SCRIPT_RUNNER_SETTINGS.dummy.script_name
     DUMMY_SCRIPT_CONTENT = '''\
     """
     play_sound.py – dummy script that plays a Windows system sound.
@@ -83,7 +89,7 @@ if __name__ == "__main__":
     '''
 
     def ensure_dummy_script() -> pathlib.Path:
-        path = pathlib.Path("C:/")
+        path = pathlib.Path(SCRIPT_RUNNER_SETTINGS.dummy.script_directory)
         target = path / DUMMY_SCRIPT_NAME
         if not target.exists():
             target.write_text(
@@ -102,12 +108,12 @@ if __name__ == "__main__":
             run_script(DUMMY_SCRIPT_NAME, script_path=script_dir)
 
         logger.info("=== SCRIPT RUNNER – HOTKEY MODE ===")
-        logger.info(f"  Ctrl+Shift+R  ->  run {DUMMY_SCRIPT_NAME}")
+        logger.info(f"  {SCRIPT_RUNNER_SETTINGS.hotkeys.run_dummy}  ->  run {DUMMY_SCRIPT_NAME}")
         logger.info("  ESC           ->  quit")
         logger.info("-----------------------------------")
 
-        keyboard.add_hotkey("ctrl+shift+r", run_dummy)
-        keyboard.wait("esc")
+        keyboard.add_hotkey(SCRIPT_RUNNER_SETTINGS.hotkeys.run_dummy, run_dummy)
+        keyboard.wait(SCRIPT_RUNNER_SETTINGS.hotkeys.exit)
 
         logger.info("Выход...")
 
