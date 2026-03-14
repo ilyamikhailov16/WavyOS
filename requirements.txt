@@ -2,4 +2,4 @@ pywin32>=308,<309
 psutil>=7,<8
 playwright>=1.40,<2
 PyAutoGUI~=0.9.54
-pycaw~=20251023
+pycaw

@@ -1,8 +1,17 @@
 import argparse
 import asyncio
 import logging
+import subprocess
 from pathlib import Path
+import time
+from urllib.parse import quote_plus
+import winreg
 
+import psutil
+import pyautogui
+import win32con
+import win32gui
+import win32process
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
@@ -15,19 +24,61 @@ PRESETS = {
     "google": {
         "url": "https://www.google.com/",
         "input_selector": 'textarea[name="q"]',
+        "search_url": "https://www.google.com/search?q={query}",
     },
     "bing": {
         "url": "https://www.bing.com/",
         "input_selector": 'textarea[name="q"], input[name="q"]',
+        "search_url": "https://www.bing.com/search?q={query}",
     },
     "duckduckgo": {
         "url": "https://duckduckgo.com/",
         "input_selector": 'textarea[name="q"], input[name="q"]',
+        "search_url": "https://duckduckgo.com/?q={query}",
     },
     "yandex": {
         "url": "https://ya.ru/",
         "input_selector": 'input[name="text"]',
+        "search_url": "https://ya.ru/search/?text={query}",
     },
+}
+
+DEFAULT_BROWSER_PROGID_KEY = (
+    r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
+)
+PROGID_TO_BROWSER = {
+    "MSEdgeHTM": {"playwright_browser": "chromium", "channel": "msedge"},
+    "ChromeHTML": {"playwright_browser": "chromium", "channel": "chrome"},
+    "FirefoxURL": {"playwright_browser": "firefox", "channel": None},
+    "FirefoxHTML": {"playwright_browser": "firefox", "channel": None},
+}
+CUSTOM_BROWSER_PATHS = {
+    "opera": [
+        Path.home() / "AppData/Local/Programs/Opera/opera.exe",
+        Path.home() / "AppData/Local/Programs/Opera/launcher.exe",
+        Path.home() / "AppData/Local/Programs/Opera GX/launcher.exe",
+        Path("C:/Program Files/Opera/opera.exe"),
+        Path("C:/Program Files/Opera/launcher.exe"),
+        Path("C:/Program Files/Opera GX/opera.exe"),
+        Path("C:/Program Files/Opera GX/launcher.exe"),
+        Path("C:/Program Files (x86)/Opera/opera.exe"),
+        Path("C:/Program Files (x86)/Opera/launcher.exe"),
+        Path("C:/Program Files (x86)/Opera GX/opera.exe"),
+        Path("C:/Program Files (x86)/Opera GX/launcher.exe"),
+    ],
+    "yandex": [
+        Path.home() / "AppData/Local/Yandex/YandexBrowser/Application/browser.exe",
+        Path("C:/Program Files/Yandex/YandexBrowser/Application/browser.exe"),
+        Path("C:/Program Files (x86)/Yandex/YandexBrowser/Application/browser.exe"),
+    ],
+}
+PROCESS_NAMES = {
+    "chromium": {"chrome.exe", "msedge.exe", "opera.exe", "browser.exe"},
+    "chrome": {"chrome.exe"},
+    "edge": {"msedge.exe"},
+    "firefox": {"firefox.exe"},
+    "opera": {"opera.exe", "launcher.exe"},
+    "yandex": {"browser.exe"},
 }
 
 
@@ -59,9 +110,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--browser",
-        choices=("chromium", "firefox", "webkit"),
-        default="chromium",
-        help="Browser engine to launch.",
+        choices=("default", "chromium", "firefox", "webkit", "chrome", "edge", "opera", "yandex"),
+        default="default",
+        help="Browser to launch. 'default' resolves the Windows default browser.",
     )
     parser.add_argument(
         "--headed",
@@ -102,12 +153,264 @@ def resolve_config(args: argparse.Namespace) -> tuple[str, str]:
     return url, input_selector
 
 
+def build_direct_search_url(args: argparse.Namespace) -> str | None:
+    if not args.engine:
+        return None
+    if args.input_selector or args.submit_selector:
+        return None
+
+    preset = PRESETS.get(args.engine, {})
+    search_url = preset.get("search_url")
+    if not search_url:
+        return None
+    return search_url.format(query=quote_plus(args.query))
+
+
+def get_windows_default_browser_progid() -> str | None:
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, DEFAULT_BROWSER_PROGID_KEY) as key:
+            progid, _ = winreg.QueryValueEx(key, "ProgId")
+            return progid
+    except OSError:
+        return None
+
+
+def find_custom_browser_executable(browser_name: str) -> Path | None:
+    for path in CUSTOM_BROWSER_PATHS.get(browser_name, []):
+        if path.exists():
+            return path
+    return None
+
+
+def map_progid_to_browser(progid: str) -> str | None:
+    if progid in {"MSEdgeHTM"}:
+        return "edge"
+    if progid in {"ChromeHTML"}:
+        return "chrome"
+    if progid in {"FirefoxURL", "FirefoxHTML"}:
+        return "firefox"
+    if progid.startswith("Opera"):
+        return "opera"
+    if "Yandex" in progid:
+        return "yandex"
+    return None
+
+
+def find_running_browser_window(browser_key: str) -> int | None:
+    process_names = PROCESS_NAMES.get(browser_key, set())
+    if not process_names:
+        return None
+
+    matching_pids = {
+        proc.info["pid"]
+        for proc in psutil.process_iter(["pid", "name"])
+        if (proc.info.get("name") or "").lower() in process_names
+    }
+    if not matching_pids:
+        return None
+
+    found_hwnd: int | None = None
+
+    def callback(hwnd: int, _: object) -> bool:
+        nonlocal found_hwnd
+        if found_hwnd is not None:
+            return False
+        if not win32gui.IsWindowVisible(hwnd):
+            return True
+
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        if pid not in matching_pids:
+            return True
+
+        title = win32gui.GetWindowText(hwnd)
+        if not title:
+            return True
+
+        found_hwnd = hwnd
+        return False
+
+    win32gui.EnumWindows(callback, None)
+    return found_hwnd
+
+
+def focus_existing_browser_window(hwnd: int) -> bool:
+    try:
+        if win32gui.IsIconic(hwnd):
+            logger.info("The existing browser window is minimized. Restoring it before reuse.")
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        win32gui.SetForegroundWindow(hwnd)
+        time.sleep(0.4)
+        return True
+    except Exception as exc:
+        logger.warning("Could not focus the existing browser window: %s", exc)
+        return False
+
+
+def get_launch_command_for_browser(browser_key: str) -> list[str] | None:
+    if browser_key == "chrome":
+        return ["cmd", "/c", "start", "chrome"]
+    if browser_key == "edge":
+        return ["cmd", "/c", "start", "msedge"]
+    if browser_key == "firefox":
+        return ["cmd", "/c", "start", "firefox"]
+    if browser_key in {"opera", "yandex"}:
+        executable_path = find_custom_browser_executable(browser_key)
+        if executable_path:
+            return [str(executable_path)]
+    if browser_key == "chromium":
+        return None
+    return None
+
+
+def open_url_in_existing_browser(browser_key: str, target_url: str) -> bool:
+    hwnd = find_running_browser_window(browser_key)
+    if hwnd is None:
+        return False
+
+    logger.info("An existing browser window was found. Requesting the browser to open a new URL.")
+    launch_command = get_launch_command_for_browser(browser_key)
+
+    try:
+        if launch_command:
+            subprocess.Popen([*launch_command, target_url])
+            return True
+
+        if focus_existing_browser_window(hwnd):
+            pyautogui.hotkey("ctrl", "t")
+            time.sleep(0.4)
+            pyautogui.hotkey("ctrl", "l")
+            time.sleep(0.2)
+            pyautogui.write(target_url, interval=0.01)
+            pyautogui.press("enter")
+            return True
+    except Exception as exc:
+        logger.warning("Could not open a URL in the existing browser window: %s", exc)
+
+    return False
+
+
+def resolve_browser_launch_options(
+    args: argparse.Namespace,
+) -> tuple[str, dict[str, str | bool], str, str]:
+    if args.browser == "chromium":
+        logger.info("Browser selection: explicit Playwright Chromium.")
+        return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+    if args.browser == "firefox":
+        logger.info("Browser selection: explicit Playwright Firefox.")
+        return "firefox", {"headless": not args.headed}, "Playwright Firefox", "firefox"
+    if args.browser == "webkit":
+        logger.info("Browser selection: explicit Playwright WebKit.")
+        return "webkit", {"headless": not args.headed}, "Playwright WebKit", "webkit"
+    if args.browser == "chrome":
+        logger.info("Browser selection: explicit Google Chrome channel.")
+        return "chromium", {"headless": not args.headed, "channel": "chrome"}, "Google Chrome", "chrome"
+    if args.browser == "edge":
+        logger.info("Browser selection: explicit Microsoft Edge channel.")
+        return "chromium", {"headless": not args.headed, "channel": "msedge"}, "Microsoft Edge", "edge"
+    if args.browser in {"opera", "yandex"}:
+        executable_path = find_custom_browser_executable(args.browser)
+        readable_name = "Opera" if args.browser == "opera" else "Yandex Browser"
+        if executable_path:
+            logger.info("Browser selection: explicit %s executable.", readable_name)
+            logger.info("Playwright will launch via executable: %s", executable_path)
+            return (
+                "chromium",
+                {"headless": not args.headed, "executable_path": str(executable_path)},
+                readable_name,
+                args.browser,
+            )
+        logger.warning("%s executable was not found in the standard Windows paths.", readable_name)
+        logger.warning("Fallback selected: Playwright Chromium will be used.")
+        return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+
+    progid = get_windows_default_browser_progid()
+    if progid:
+        browser_key = map_progid_to_browser(progid)
+        if browser_key:
+            readable_name = {
+                "edge": "Microsoft Edge",
+                "chrome": "Google Chrome",
+                "firefox": "Mozilla Firefox",
+                "opera": "Opera",
+                "yandex": "Yandex Browser",
+            }[browser_key]
+            logger.info("Windows default browser detected: %s (%s)", readable_name, progid)
+
+            if browser_key in {"edge", "chrome", "firefox"}:
+                mapped_args = argparse.Namespace(browser=browser_key, headed=args.headed)
+                return resolve_browser_launch_options(mapped_args)
+
+            executable_path = find_custom_browser_executable(browser_key)
+            if executable_path:
+                logger.info(
+                    "Playwright will launch the installed %s browser via executable path.",
+                    readable_name,
+                )
+                logger.info("Executable path: %s", executable_path)
+                return (
+                    "chromium",
+                    {"headless": not args.headed, "executable_path": str(executable_path)},
+                    readable_name,
+                    browser_key,
+                )
+
+            logger.warning("%s is the Windows default browser, but its executable was not found.", readable_name)
+            logger.warning(
+                "Fallback selected: Playwright Chromium will be used instead of the system default browser."
+            )
+            return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+
+        logger.warning(
+            "Windows default browser '%s' is not mapped yet.", progid
+        )
+        logger.warning(
+            "Fallback selected: Playwright Chromium will be used instead of the system default browser."
+        )
+    else:
+        logger.warning(
+            "Could not detect the Windows default browser."
+        )
+        logger.warning(
+            "Fallback selected: Playwright Chromium will be used."
+        )
+
+    return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+
+
 async def run_browser_task(args: argparse.Namespace) -> None:
     url, input_selector = resolve_config(args)
+    browser_name, launch_kwargs, browser_label, browser_key = resolve_browser_launch_options(args)
+    direct_search_url = build_direct_search_url(args)
+
+    if args.headed and browser_key in PROCESS_NAMES:
+        existing_tab_url = direct_search_url or url
+        if direct_search_url or (args.url and not args.input_selector and not args.submit_selector):
+            if open_url_in_existing_browser(browser_key, existing_tab_url):
+                logger.info("Opened a new tab in the existing %s window.", browser_label)
+                if direct_search_url:
+                    logger.info("The query was sent through the URL directly.")
+                else:
+                    logger.info("Opened the requested URL in a new tab without launching a new window.")
+                return
+
+            logger.info(
+                "No reusable %s window was found, so a Playwright-managed window will be launched.",
+                browser_label,
+            )
+        else:
+            logger.info(
+                "Existing-browser tab reuse is skipped because this scenario still needs page interaction."
+            )
 
     async with async_playwright() as playwright:
-        browser_type = getattr(playwright, args.browser)
-        browser = await browser_type.launch(headless=not args.headed)
+        browser_type = getattr(playwright, browser_name)
+
+        logger.info(
+            "Launching browser via Playwright: %s (engine=%s)",
+            browser_label,
+            browser_name,
+        )
+        browser = await browser_type.launch(**launch_kwargs)
 
         try:
             page = await browser.new_page()
@@ -162,6 +465,7 @@ def main() -> int:
         logger.error("Browser automation failed: %s", exc)
         logger.info("If Playwright is not installed yet, run: pip install -r requirements.txt")
         logger.info("Then install a browser once: playwright install chromium")
+        logger.info("If you use Firefox with --browser default, you may also need: playwright install firefox")
         return 1
 
     logger.info("Browser automation finished successfully.")
