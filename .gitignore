@@ -1,0 +1,60 @@
+# Python cache / tooling
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Local environment / secrets
+.env
+.env.*
+
+# IDE / editor
+.idea/
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Logs / temp
+*.log
+*.tmp
+tmp/
+temp/
+
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
+# ffmpeg and capture artifacts
+screen_records/
+recordings/
+captures/
+videos/
+screenshots/
+screenshot_*.png
+*.avi
+*.mp4
+*.mkv
+
+# Local browser / automation state
+user-data/
+browser-profile/
+downloads/

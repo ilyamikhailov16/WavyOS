@@ -1,91 +1,74 @@
 import os
 import pathlib
-import logging
 
 import keyboard
 import send2trash
 import win32com.shell.shell as shell
 
-SHERB_NOCONFIRMATION = 0x00000001  # no confirmation dialog
-SHERB_NOPROGRESSUI = 0x00000002  # no progress window
-SHERB_NOSOUND = 0x00000004  # no completion sound
+from bootstrap import settings
+from app_logging import get_logger
 
-ALREADY_EMPTY_HRESULTS = (
-    -2147024809,  # 0x80070057 – standard "already empty"
-    -2147418113,  # 0x8000FFFF – "Catastrophic failure" = also already empty
-)
-
-logging.basicConfig(
-    level=logging.DEBUG,  # This enables DEBUG and above
-    format="%(levelname)s - %(message)s",
-)
-
-logger = logging.getLogger(__name__)
+TRASH_TOOL_SETTINGS = settings.trash_tool
+logger = get_logger(__name__)
 
 
 def clear_folder(folder_path: str | os.PathLike) -> None:
     folder = pathlib.Path(folder_path)
-
     if not folder.is_dir():
-        logger.error(f"[clear_folder] Not a directory or does not exist: {folder}")
+        logger.error("[clear_folder] Not a directory or it does not exist: %s", folder)
         return
 
     items = list(folder.iterdir())
     if not items:
-        logger.info(f"[clear_folder] Folder is already empty: {folder}")
+        logger.info("[clear_folder] Folder is already empty: %s", folder)
         return
 
-    errors = []
+    errors: list[tuple[pathlib.Path, Exception]] = []
     for item in items:
         try:
             send2trash.send2trash(str(item))
-            logger.info(f"Trashed: {item.name}")
+            logger.info("Trashed: %s", item.name)
         except Exception as exc:
             errors.append((item, exc))
 
     if errors:
         for item, exc in errors:
-            logger.error(f"[clear_folder] Could not trash '{item.name}': {exc}")
-    else:
-        logger.info(f"[clear_folder] Done – {len(items)} item(s) moved to Recycle Bin.")
+            logger.error("[clear_folder] Could not trash '%s': %s", item.name, exc)
+        return
+
+    logger.info("[clear_folder] Done. %s item(s) moved to Recycle Bin.", len(items))
 
 
 def clear_downloads() -> None:
-    downloads = pathlib.Path.home() / "Downloads"
-    logger.info(f"[clear_downloads] Clearing: {downloads}")
+    downloads = pathlib.Path.home() / TRASH_TOOL_SETTINGS.paths.downloads_dir_name
+    logger.info("[clear_downloads] Clearing: %s", downloads)
     clear_folder(downloads)
 
 
 def empty_recycle_bin() -> None:
-    flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND
+    flags = (
+        TRASH_TOOL_SETTINGS.shell.no_confirmation
+        | TRASH_TOOL_SETTINGS.shell.no_progress_ui
+        | TRASH_TOOL_SETTINGS.shell.no_sound
+    )
 
     try:
-        # SHEmptyRecycleBin(hwnd, pszRootPath, dwFlags)
-        # hwnd = None  ->  no parent window (dialogs appear as top-level windows on taskbar)
-        # pszRootPath = None  ->  empties all drives
         shell.SHEmptyRecycleBin(None, None, flags)
         logger.info("[empty_recycle_bin] Recycle Bin emptied successfully.")
     except Exception as exc:
         hr = getattr(exc, "hresult", None)
-        if hr in ALREADY_EMPTY_HRESULTS:
+        if hr in TRASH_TOOL_SETTINGS.shell.already_empty_hresult:
             logger.info("[empty_recycle_bin] Recycle Bin is already empty.")
         else:
-            logger.error(f"[empty_recycle_bin] Failed: {exc}")
+            logger.error("[empty_recycle_bin] Failed: %s", exc)
 
 
 def hotkeys() -> None:
-    logger.info("=== РЕЖИМ ГОРЯЧИХ КЛАВИШ ===")
-    logger.info("  Ctrl+Shift+D  ->  очистка папки загрузок")
-    logger.info("  Ctrl+Shift+R  ->  очистка корзины")
-    logger.info("  ESC  ->  выход")
-    logger.info("----------------------------")
-
-    keyboard.add_hotkey("ctrl+shift+d", clear_downloads)
-    keyboard.add_hotkey("ctrl+shift+r", empty_recycle_bin)
-
-    keyboard.wait("esc")
-
-    logger.info("Выход...")
+    logger.info("Hotkey mode started.")
+    keyboard.add_hotkey(TRASH_TOOL_SETTINGS.hotkeys.clear_downloads, clear_downloads)
+    keyboard.add_hotkey(TRASH_TOOL_SETTINGS.hotkeys.empty_recycle_bin, empty_recycle_bin)
+    keyboard.wait(TRASH_TOOL_SETTINGS.hotkeys.exit)
+    logger.info("Exiting hotkey mode.")
 
 
 if __name__ == "__main__":

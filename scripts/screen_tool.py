@@ -1,47 +1,52 @@
-
 import threading
 import time
 from pathlib import Path
 
 import cv2
-import numpy as np
-import mss
 import keyboard
+import mss
+import numpy as np
 import pyautogui
 
-OUT_DIR = Path.cwd() / "screen_records"
+from app_logging import get_logger
+from bootstrap import settings
+
+
+SCREEN_TOOL_SETTINGS = settings.screen_tool
+OUT_DIR = Path.cwd() / SCREEN_TOOL_SETTINGS.paths.records_dir_name
 OUT_DIR.mkdir(exist_ok=True)
 
+logger = get_logger(__name__)
 recording = False
 record_thread = None
 
 
-def timestamp():
+def timestamp() -> str:
     return time.strftime("%Y%m%d_%H%M%S")
 
 
-def take_screenshot():
+def take_screenshot() -> None:
     img = pyautogui.screenshot()
-    filename = Path.cwd() / f"screenshot_{timestamp()}.png"
+    filename = Path.cwd() / f"{SCREEN_TOOL_SETTINGS.paths.screenshot_prefix}_{timestamp()}.png"
     img.save(filename)
-    print(f"[✓] Скриншот сохранён: {filename}")
+    logger.info("Screenshot saved: %s", filename)
 
 
-def record_screen():
+def record_screen() -> None:
     global recording
 
     with mss.mss() as sct:
         monitor = sct.monitors[1]
         width = monitor["width"]
         height = monitor["height"]
+        filename = (
+            OUT_DIR
+            / f"{SCREEN_TOOL_SETTINGS.paths.record_prefix}_{timestamp()}.{SCREEN_TOOL_SETTINGS.paths.record_extension}"
+        )
+        fourcc = cv2.VideoWriter_fourcc(*SCREEN_TOOL_SETTINGS.video_codec)
+        out = cv2.VideoWriter(str(filename), fourcc, SCREEN_TOOL_SETTINGS.fps, (width, height))
 
-        filename = OUT_DIR / f"record_{timestamp()}.avi"
-
-        fourcc = cv2.VideoWriter_fourcc(*"XVID")
-        out = cv2.VideoWriter(str(filename), fourcc, 20.0, (width, height))
-
-        print(f"[●] Запись начата → {filename}")
-
+        logger.info("Recording started: %s", filename)
         while recording:
             img = sct.grab(monitor)
             frame = np.array(img)
@@ -49,14 +54,14 @@ def record_screen():
             out.write(frame)
 
         out.release()
-        print("[■] Запись остановлена")
+        logger.info("Recording stopped.")
 
 
-def start_recording():
+def start_recording() -> None:
     global recording, record_thread
 
     if recording:
-        print("[!] Уже записывается")
+        logger.warning("Recording is already in progress.")
         return
 
     recording = True
@@ -64,39 +69,32 @@ def start_recording():
     record_thread.start()
 
 
-def stop_recording():
+def stop_recording() -> None:
     global recording
     if not recording:
-        print("[!] Запись не запущена")
+        logger.warning("Recording is not running.")
         return
     recording = False
 
 
-def toggle_recording():
+def toggle_recording() -> None:
     if recording:
         stop_recording()
     else:
         start_recording()
 
 
-def hotkeys():
-    print("=== РЕЖИМ ГОРЯЧИХ КЛАВИШ ===")
-    print("F9  → старт / стоп записи")
-    print("F12 → скриншот")
-    print("ESC → выход")
-    print("----------------------------")
-
-    keyboard.add_hotkey("F9", toggle_recording)
-    keyboard.add_hotkey("F12", take_screenshot)
-
-    keyboard.wait("esc")
+def hotkeys() -> None:
+    logger.info("Hotkey mode started.")
+    keyboard.add_hotkey(SCREEN_TOOL_SETTINGS.hotkeys.toggle_recording, toggle_recording)
+    keyboard.add_hotkey(SCREEN_TOOL_SETTINGS.hotkeys.screenshot, take_screenshot)
+    keyboard.wait(SCREEN_TOOL_SETTINGS.hotkeys.exit)
 
     if recording:
         stop_recording()
 
-    print("Выход...")
+    logger.info("Exiting hotkey mode.")
 
 
 if __name__ == "__main__":
     hotkeys()
-
