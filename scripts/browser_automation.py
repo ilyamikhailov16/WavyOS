@@ -3,6 +3,7 @@ import asyncio
 import logging
 import subprocess
 from pathlib import Path
+import sys
 import time
 from urllib.parse import quote_plus
 import winreg
@@ -19,67 +20,26 @@ from playwright.async_api import async_playwright
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
-PRESETS = {
-    "google": {
-        "url": "https://www.google.com/",
-        "input_selector": 'textarea[name="q"]',
-        "search_url": "https://www.google.com/search?q={query}",
-    },
-    "bing": {
-        "url": "https://www.bing.com/",
-        "input_selector": 'textarea[name="q"], input[name="q"]',
-        "search_url": "https://www.bing.com/search?q={query}",
-    },
-    "duckduckgo": {
-        "url": "https://duckduckgo.com/",
-        "input_selector": 'textarea[name="q"], input[name="q"]',
-        "search_url": "https://duckduckgo.com/?q={query}",
-    },
-    "yandex": {
-        "url": "https://ya.ru/",
-        "input_selector": 'input[name="text"]',
-        "search_url": "https://ya.ru/search/?text={query}",
-    },
-}
+from config import settings
 
 DEFAULT_BROWSER_PROGID_KEY = (
     r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
 )
 PROGID_TO_BROWSER = {
-    "MSEdgeHTM": {"playwright_browser": "chromium", "channel": "msedge"},
-    "ChromeHTML": {"playwright_browser": "chromium", "channel": "chrome"},
-    "FirefoxURL": {"playwright_browser": "firefox", "channel": None},
-    "FirefoxHTML": {"playwright_browser": "firefox", "channel": None},
+    "MSEdgeHTM": "edge",
+    "ChromeHTML": "chrome",
+    "FirefoxURL": "firefox",
+    "FirefoxHTML": "firefox",
 }
-CUSTOM_BROWSER_PATHS = {
-    "opera": [
-        Path.home() / "AppData/Local/Programs/Opera/opera.exe",
-        Path.home() / "AppData/Local/Programs/Opera/launcher.exe",
-        Path.home() / "AppData/Local/Programs/Opera GX/launcher.exe",
-        Path("C:/Program Files/Opera/opera.exe"),
-        Path("C:/Program Files/Opera/launcher.exe"),
-        Path("C:/Program Files/Opera GX/opera.exe"),
-        Path("C:/Program Files/Opera GX/launcher.exe"),
-        Path("C:/Program Files (x86)/Opera/opera.exe"),
-        Path("C:/Program Files (x86)/Opera/launcher.exe"),
-        Path("C:/Program Files (x86)/Opera GX/opera.exe"),
-        Path("C:/Program Files (x86)/Opera GX/launcher.exe"),
-    ],
-    "yandex": [
-        Path.home() / "AppData/Local/Yandex/YandexBrowser/Application/browser.exe",
-        Path("C:/Program Files/Yandex/YandexBrowser/Application/browser.exe"),
-        Path("C:/Program Files (x86)/Yandex/YandexBrowser/Application/browser.exe"),
-    ],
-}
-PROCESS_NAMES = {
-    "chromium": {"chrome.exe", "msedge.exe", "opera.exe", "browser.exe"},
-    "chrome": {"chrome.exe"},
-    "edge": {"msedge.exe"},
-    "firefox": {"firefox.exe"},
-    "opera": {"opera.exe", "launcher.exe"},
-    "yandex": {"browser.exe"},
-}
+BROWSER_SETTINGS = settings.browser
+PRESETS = BROWSER_SETTINGS.presets
+PROCESS_NAMES = BROWSER_SETTINGS.process_names
+DEFAULT_TIMEOUT_MS = BROWSER_SETTINGS.timeouts.default_timeout_ms
+DEFAULT_WAIT_AFTER_MS = BROWSER_SETTINGS.timeouts.default_wait_after_ms
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,7 +48,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--engine",
-        choices=sorted(PRESETS),
+        choices=PRESETS.names(),
         help="Use a built-in preset for a known search engine.",
     )
     parser.add_argument(
@@ -122,13 +82,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--timeout-ms",
         type=int,
-        default=15000,
+        default=DEFAULT_TIMEOUT_MS,
         help="Timeout for page actions in milliseconds.",
     )
     parser.add_argument(
         "--wait-after-ms",
         type=int,
-        default=3000,
+        default=DEFAULT_WAIT_AFTER_MS,
         help="How long to wait after submitting the query.",
     )
     parser.add_argument(
@@ -139,9 +99,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_config(args: argparse.Namespace) -> tuple[str, str]:
-    preset = PRESETS.get(args.engine, {})
-    url = args.url or preset.get("url")
-    input_selector = args.input_selector or preset.get("input_selector")
+    preset = PRESETS.get(args.engine)
+    url = args.url or (preset.url if preset else None)
+    input_selector = args.input_selector or (preset.input_selector if preset else None)
 
     if not url:
         raise ValueError("Specify --url or use --engine with a built-in URL preset.")
@@ -159,8 +119,8 @@ def build_direct_search_url(args: argparse.Namespace) -> str | None:
     if args.input_selector or args.submit_selector:
         return None
 
-    preset = PRESETS.get(args.engine, {})
-    search_url = preset.get("search_url")
+    preset = PRESETS.get(args.engine)
+    search_url = preset.search_url if preset else None
     if not search_url:
         return None
     return search_url.format(query=quote_plus(args.query))
@@ -176,19 +136,15 @@ def get_windows_default_browser_progid() -> str | None:
 
 
 def find_custom_browser_executable(browser_name: str) -> Path | None:
-    for path in CUSTOM_BROWSER_PATHS.get(browser_name, []):
+    for path in BROWSER_SETTINGS.paths.for_browser(browser_name):
         if path.exists():
             return path
     return None
 
 
 def map_progid_to_browser(progid: str) -> str | None:
-    if progid in {"MSEdgeHTM"}:
-        return "edge"
-    if progid in {"ChromeHTML"}:
-        return "chrome"
-    if progid in {"FirefoxURL", "FirefoxHTML"}:
-        return "firefox"
+    if progid in PROGID_TO_BROWSER:
+        return PROGID_TO_BROWSER[progid]
     if progid.startswith("Opera"):
         return "opera"
     if "Yandex" in progid:
@@ -197,7 +153,7 @@ def map_progid_to_browser(progid: str) -> str | None:
 
 
 def find_running_browser_window(browser_key: str) -> int | None:
-    process_names = PROCESS_NAMES.get(browser_key, set())
+    process_names = PROCESS_NAMES.for_browser(browser_key)
     if not process_names:
         return None
 
@@ -382,7 +338,7 @@ async def run_browser_task(args: argparse.Namespace) -> None:
     browser_name, launch_kwargs, browser_label, browser_key = resolve_browser_launch_options(args)
     direct_search_url = build_direct_search_url(args)
 
-    if args.headed and browser_key in PROCESS_NAMES:
+    if args.headed and PROCESS_NAMES.for_browser(browser_key):
         existing_tab_url = direct_search_url or url
         if direct_search_url or (args.url and not args.input_selector and not args.submit_selector):
             if open_url_in_existing_browser(browser_key, existing_tab_url):
