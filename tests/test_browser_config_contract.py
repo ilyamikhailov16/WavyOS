@@ -16,3 +16,12 @@ def test_browser_preset_search_urls_support_query_placeholder() -> None:
     assert "{query}" in presets.bing.search_url
     assert "{query}" in presets.duckduckgo.search_url
     assert "{query}" in presets.yandex.search_url
+
+
+def test_browser_runtime_contract() -> None:
+    runtime = settings.browser.runtime
+
+    assert "default" in runtime.browser_choices
+    assert runtime.display_name_for("edge") == "Microsoft Edge"
+    assert runtime.playwright_channel_for("chrome") == "chrome"
+    assert runtime.launch_command_for("firefox") == ["cmd", "/c", "start", "firefox"]

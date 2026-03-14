@@ -26,15 +26,6 @@ if str(BASE_DIR) not in sys.path:
 
 from config import settings
 
-DEFAULT_BROWSER_PROGID_KEY = (
-    r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
-)
-PROGID_TO_BROWSER = {
-    "MSEdgeHTM": "edge",
-    "ChromeHTML": "chrome",
-    "FirefoxURL": "firefox",
-    "FirefoxHTML": "firefox",
-}
 BROWSER_SETTINGS = settings.browser
 PRESETS = BROWSER_SETTINGS.presets
 PROCESS_NAMES = BROWSER_SETTINGS.process_names
@@ -70,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--browser",
-        choices=("default", "chromium", "firefox", "webkit", "chrome", "edge", "opera", "yandex"),
+        choices=BROWSER_SETTINGS.runtime.browser_choices,
         default="default",
         help="Browser to launch. 'default' resolves the Windows default browser.",
     )
@@ -128,7 +119,10 @@ def build_direct_search_url(args: argparse.Namespace) -> str | None:
 
 def get_windows_default_browser_progid() -> str | None:
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, DEFAULT_BROWSER_PROGID_KEY) as key:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            BROWSER_SETTINGS.registry.default_browser_progid_key,
+        ) as key:
             progid, _ = winreg.QueryValueEx(key, "ProgId")
             return progid
     except OSError:
@@ -143,8 +137,8 @@ def find_custom_browser_executable(browser_name: str) -> Path | None:
 
 
 def map_progid_to_browser(progid: str) -> str | None:
-    if progid in PROGID_TO_BROWSER:
-        return PROGID_TO_BROWSER[progid]
+    if progid in BROWSER_SETTINGS.registry.progid_to_browser:
+        return BROWSER_SETTINGS.registry.progid_to_browser[progid]
     if progid.startswith("Opera"):
         return "opera"
     if "Yandex" in progid:
@@ -203,12 +197,9 @@ def focus_existing_browser_window(hwnd: int) -> bool:
 
 
 def get_launch_command_for_browser(browser_key: str) -> list[str] | None:
-    if browser_key == "chrome":
-        return ["cmd", "/c", "start", "chrome"]
-    if browser_key == "edge":
-        return ["cmd", "/c", "start", "msedge"]
-    if browser_key == "firefox":
-        return ["cmd", "/c", "start", "firefox"]
+    launch_command = BROWSER_SETTINGS.runtime.launch_command_for(browser_key)
+    if launch_command:
+        return launch_command
     if browser_key in {"opera", "yandex"}:
         executable_path = find_custom_browser_executable(browser_key)
         if executable_path:
@@ -250,22 +241,53 @@ def resolve_browser_launch_options(
 ) -> tuple[str, dict[str, str | bool], str, str]:
     if args.browser == "chromium":
         logger.info("Browser selection: explicit Playwright Chromium.")
-        return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+        return (
+            "chromium",
+            {"headless": not args.headed},
+            BROWSER_SETTINGS.runtime.display_name_for("chromium"),
+            "chromium",
+        )
     if args.browser == "firefox":
         logger.info("Browser selection: explicit Playwright Firefox.")
-        return "firefox", {"headless": not args.headed}, "Playwright Firefox", "firefox"
+        return (
+            "firefox",
+            {"headless": not args.headed},
+            BROWSER_SETTINGS.runtime.display_name_for("firefox"),
+            "firefox",
+        )
     if args.browser == "webkit":
         logger.info("Browser selection: explicit Playwright WebKit.")
-        return "webkit", {"headless": not args.headed}, "Playwright WebKit", "webkit"
+        return (
+            "webkit",
+            {"headless": not args.headed},
+            BROWSER_SETTINGS.runtime.display_name_for("webkit"),
+            "webkit",
+        )
     if args.browser == "chrome":
         logger.info("Browser selection: explicit Google Chrome channel.")
-        return "chromium", {"headless": not args.headed, "channel": "chrome"}, "Google Chrome", "chrome"
+        return (
+            "chromium",
+            {
+                "headless": not args.headed,
+                "channel": BROWSER_SETTINGS.runtime.playwright_channel_for("chrome"),
+            },
+            BROWSER_SETTINGS.runtime.display_name_for("chrome"),
+            "chrome",
+        )
     if args.browser == "edge":
         logger.info("Browser selection: explicit Microsoft Edge channel.")
-        return "chromium", {"headless": not args.headed, "channel": "msedge"}, "Microsoft Edge", "edge"
+        return (
+            "chromium",
+            {
+                "headless": not args.headed,
+                "channel": BROWSER_SETTINGS.runtime.playwright_channel_for("edge"),
+            },
+            BROWSER_SETTINGS.runtime.display_name_for("edge"),
+            "edge",
+        )
     if args.browser in {"opera", "yandex"}:
         executable_path = find_custom_browser_executable(args.browser)
-        readable_name = "Opera" if args.browser == "opera" else "Yandex Browser"
+        readable_name = BROWSER_SETTINGS.runtime.display_name_for(args.browser)
         if executable_path:
             logger.info("Browser selection: explicit %s executable.", readable_name)
             logger.info("Playwright will launch via executable: %s", executable_path)
@@ -283,13 +305,7 @@ def resolve_browser_launch_options(
     if progid:
         browser_key = map_progid_to_browser(progid)
         if browser_key:
-            readable_name = {
-                "edge": "Microsoft Edge",
-                "chrome": "Google Chrome",
-                "firefox": "Mozilla Firefox",
-                "opera": "Opera",
-                "yandex": "Yandex Browser",
-            }[browser_key]
+            readable_name = BROWSER_SETTINGS.runtime.display_name_for(browser_key)
             logger.info("Windows default browser detected: %s (%s)", readable_name, progid)
 
             if browser_key in {"edge", "chrome", "firefox"}:

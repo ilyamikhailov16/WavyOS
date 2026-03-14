@@ -98,6 +98,71 @@ class BrowserPresetCatalogSettings(BaseModel):
         return getattr(self, preset_name, None)
 
 
+class BrowserRegistrySettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    default_browser_progid_key: str = (
+        r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
+    )
+    progid_to_browser: dict[str, str] = Field(
+        default_factory=lambda: {
+            "MSEdgeHTM": "edge",
+            "ChromeHTML": "chrome",
+            "FirefoxURL": "firefox",
+            "FirefoxHTML": "firefox",
+        }
+    )
+
+
+class BrowserRuntimeSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    browser_choices: tuple[str, ...] = (
+        "default",
+        "chromium",
+        "firefox",
+        "webkit",
+        "chrome",
+        "edge",
+        "opera",
+        "yandex",
+    )
+    display_names: dict[str, str] = Field(
+        default_factory=lambda: {
+            "chromium": "Playwright Chromium",
+            "firefox": "Playwright Firefox",
+            "webkit": "Playwright WebKit",
+            "chrome": "Google Chrome",
+            "edge": "Microsoft Edge",
+            "opera": "Opera",
+            "yandex": "Yandex Browser",
+        }
+    )
+    launch_commands: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "chrome": ["cmd", "/c", "start", "chrome"],
+            "edge": ["cmd", "/c", "start", "msedge"],
+            "firefox": ["cmd", "/c", "start", "firefox"],
+        }
+    )
+    playwright_channels: dict[str, str] = Field(
+        default_factory=lambda: {
+            "chrome": "chrome",
+            "edge": "msedge",
+        }
+    )
+
+    def display_name_for(self, browser_name: str) -> str:
+        return self.display_names.get(browser_name, browser_name)
+
+    def launch_command_for(self, browser_name: str) -> list[str] | None:
+        command = self.launch_commands.get(browser_name)
+        return list(command) if command else None
+
+    def playwright_channel_for(self, browser_name: str) -> str | None:
+        return self.playwright_channels.get(browser_name)
+
+
 class BrowserSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -105,6 +170,8 @@ class BrowserSettings(BaseModel):
     presets: BrowserPresetCatalogSettings = BrowserPresetCatalogSettings()
     paths: BrowserPathsSettings = BrowserPathsSettings()
     process_names: ProcessNamesSettings = ProcessNamesSettings()
+    registry: BrowserRegistrySettings = BrowserRegistrySettings()
+    runtime: BrowserRuntimeSettings = BrowserRuntimeSettings()
 
 
 class ScreenToolPathsSettings(BaseModel):
