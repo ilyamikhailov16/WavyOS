@@ -2,7 +2,6 @@
 
 from openai import OpenAI
 
-
 class LLMProcessor:
     def __init__(self, api_key: str, model_path: str, system_prompt: str) -> None:
         """Object initialization. The model and system prompt are fixed"""
