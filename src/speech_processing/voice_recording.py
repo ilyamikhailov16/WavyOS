@@ -1,6 +1,7 @@
 import os
-import keyboard
+import queue as q
 import threading as th
+from typing import Callable
 from RealtimeSTT import AudioToTextRecorder
 
 # Constants
@@ -8,7 +9,7 @@ os.environ["CT2_VERBOSE"] = "-3"
 EXIT_KEY = "esc"
 CLEAR_COMMAND = "cls"
 AUDIO_RECORDER_PARAMS = {
-    "model": "large-v2",  # Options: "tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2".
+    "model": "tiny",  # Options: "tiny", "tiny.en", "base", "base.en", "small", "small.en", "medium", "medium.en", "large-v1", "large-v2".
     "language": "ru",
     "compute_type": "default", # Quantization: int8, int8_float32, int8_float16, int8_bfloat16, int16, float16, bfloat16, float32.
     "silero_sensitivity": 0.6,
@@ -19,49 +20,52 @@ AUDIO_RECORDER_PARAMS = {
     "min_length_of_recording": 1.0, # Specifies the minimum duration in seconds that a recording session should last to ensure meaningful audio capture, preventing excessively short or fragmented recordings.
     "pre_recording_buffer_duration": 0.2, # The time span, in seconds, during which audio is buffered prior to formal recording. This helps counterbalancing the latency inherent in speech activity detection, ensuring no initial audio is missed.
     "no_log_file": True,
-    "spinner": True, # Provides a spinner animation
+    "spinner": False, # Provides a spinner animation
 }
 
 # Functions
 def process_text(text: str) -> None:
     """Post-processing of the recorded text."""
 
-    print(text)
+    return text
 
 
-def run_audio_recorder(stop_event, *args, **kwargs) -> None:
+def run_audio_recorder(stop_event: th.Event, queue: q.Queue, process_text_func: Callable, **kwargs) -> None:
     """
     Starts AudioToTextRecorder to recognize speech and convert it to text.
     Activated by voice and stops recording after a certain length of silence at the end of a speech.
     Designed to work in a separate thread, so it waits for a stop_event.
     """
+
+    def callback(text: str) -> None:
+        if queue is not None:
+            if process_text_func is not None:
+                text = process_text_func(text)
+            queue.put(text)
     
-    with AudioToTextRecorder(*args, **kwargs) as recorder:
+    with AudioToTextRecorder(**kwargs) as recorder:
         while not stop_event.is_set():
-            recorder.text(process_text)
+            recorder.text(callback)
 
 
-def run_voice_processing(audio_recorder_params: dict, exit_key: str) -> None:
+def run_voice_processing(audio_recorder_params: dict, queue: q.Queue = None, process_text_func: Callable = None) -> tuple[th.Event, th.Thread]:
     """
     Runs the voice processing thread.
-    Blocks the thread in which it is called.
-    Terminates when 'esc' is pressed.
     """
 
     stop_event = th.Event()
     recorder_thread = th.Thread(
         target=run_audio_recorder, 
-        args=(stop_event,),
+        args=(stop_event, queue, process_text_func),
         kwargs=audio_recorder_params, 
     )
-
     recorder_thread.start()
-    print("\nPress 'esc' to exit")
-    keyboard.wait(exit_key)
-    print("\nWait for completion. Your requests will no longer be processed")
-    stop_event.set()
-    recorder_thread.join()
+    return stop_event, recorder_thread
 
 
 if __name__ == "__main__":
-    run_voice_processing(AUDIO_RECORDER_PARAMS, EXIT_KEY)
+    queue = q.Queue()
+    stop_event, recorder_thread = run_voice_processing(AUDIO_RECORDER_PARAMS, queue, process_text)
+
+    while True:
+        print(queue.get())
