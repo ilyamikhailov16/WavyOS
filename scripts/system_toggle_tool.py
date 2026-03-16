@@ -9,8 +9,8 @@ import pyautogui
 import pythoncom
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
-from bootstrap import settings
 from app_logging import get_logger
+from config import settings
 
 SYSTEM_TOGGLE_SETTINGS = settings.system_toggle
 logger = get_logger(__name__)

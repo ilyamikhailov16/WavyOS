@@ -5,8 +5,8 @@ import subprocess
 import sys
 import keyboard
 
-from bootstrap import settings
 from app_logging import get_logger
+from config import settings
 
 logger = get_logger(__name__)
 

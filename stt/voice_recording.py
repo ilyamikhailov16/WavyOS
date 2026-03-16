@@ -2,6 +2,7 @@
 
 import queue as q
 import threading as th
+import traceback
 from typing import Callable
 from RealtimeSTT import AudioToTextRecorder
 
@@ -12,12 +13,15 @@ def run_audio_recorder(stop_event: th.Event, queue: q.Queue, process_text_func: 
     Activated by voice and stops recording after a certain length of silence at the end of a speech.
     Designed to work in a separate thread, so it waits for a stop_event.
     """
-
     def callback(text: str) -> None:
-        if queue is not None:
-            if process_text_func is not None:
-                text = process_text_func(text)
-            queue.put(text)
+        try:
+            if queue is not None:
+                if process_text_func is not None:
+                    text = process_text_func(text)
+                queue.put(text)
+        except Exception as e:
+            print(f"[stt.callback] Exception: {e}")
+            print(traceback.format_exc())
     
     with AudioToTextRecorder(**kwargs) as recorder:
         while not stop_event.is_set():

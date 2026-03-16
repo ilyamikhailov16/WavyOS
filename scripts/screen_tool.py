@@ -9,8 +9,7 @@ import numpy as np
 import pyautogui
 
 from app_logging import get_logger
-from bootstrap import settings
-
+from config import settings
 
 SCREEN_TOOL_SETTINGS = settings.screen_tool
 OUT_DIR = Path.cwd() / SCREEN_TOOL_SETTINGS.paths.records_dir_name

@@ -2,12 +2,13 @@
 
 from openai import OpenAI
 
+
 class LLMProcessor:
-    def __init__(self, api_key: str, model_path: str, system_prompt: str) -> None:
+    def __init__(self, base_url: str, api_key: str, model_path: str, system_prompt: str) -> None:
         """Object initialization. The model and system prompt are fixed"""
 
         self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
+            base_url=base_url,
             api_key=api_key,
         )
         self.model_path = model_path

@@ -1,6 +1,6 @@
 import pathlib
 
-import trash_tool as module
+from scripts import trash_tool as module
 
 
 def test_clear_folder_ignores_missing_directory(tmp_path, monkeypatch) -> None:

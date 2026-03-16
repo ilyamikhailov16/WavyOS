@@ -1,7 +1,7 @@
 import subprocess
 from types import SimpleNamespace
 
-import system_toggle_tool as module
+from scripts import system_toggle_tool as module
 
 
 def test_toggle_wifi_logs_no_adapter(monkeypatch) -> None:

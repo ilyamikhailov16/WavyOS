@@ -14,8 +14,8 @@ import win32process
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
-from bootstrap import settings
 from app_logging import get_logger
+from config import settings
 
 BROWSER_SETTINGS = settings.browser
 PRESETS = BROWSER_SETTINGS.presets

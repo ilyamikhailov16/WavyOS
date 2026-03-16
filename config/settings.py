@@ -1,5 +1,6 @@
+import json
+from functools import lru_cache
 from pathlib import Path
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -53,12 +54,14 @@ class ProcessNamesSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     chromium: set[str] = Field(
-        default_factory=lambda: {"chrome.exe", "msedge.exe", "opera.exe", "browser.exe"}
+        default_factory=lambda: {"chrome.exe",
+                                 "msedge.exe", "opera.exe", "browser.exe"}
     )
     chrome: set[str] = Field(default_factory=lambda: {"chrome.exe"})
     edge: set[str] = Field(default_factory=lambda: {"msedge.exe"})
     firefox: set[str] = Field(default_factory=lambda: {"firefox.exe"})
-    opera: set[str] = Field(default_factory=lambda: {"opera.exe", "launcher.exe"})
+    opera: set[str] = Field(default_factory=lambda: {
+                            "opera.exe", "launcher.exe"})
     yandex: set[str] = Field(default_factory=lambda: {"browser.exe"})
 
     def for_browser(self, browser_name: str) -> set[str]:
@@ -311,6 +314,60 @@ class LoggingSettings(BaseModel):
     format: str = "%(levelname)s - %(message)s"
 
 
+@lru_cache(maxsize=1)
+def _load_root_config() -> dict:
+    root_dir = Path(__file__).resolve().parents[1]
+    config_path = root_dir / "config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+class LLMSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    use_for_stt: bool = Field(
+        default_factory=lambda: _load_root_config().get("use_llm_for_stt", False))
+    base_url: str = Field(
+        default_factory=lambda: _load_root_config().get("api", {}).get("base_url", "https://openrouter.ai/api/v1")
+    )
+    token: str = Field(
+        default_factory=lambda: _load_root_config().get("api", {}).get(
+            "token", "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")
+    )
+    model: str = Field(
+        default_factory=lambda: _load_root_config().get(
+            "api", {}).get("model", "openrouter/free")
+    )
+
+
+class STTSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    model: str = Field(default_factory=lambda: _load_root_config().get(
+        "stt", {}).get("model", "medium"))
+    language: str = Field(default_factory=lambda: _load_root_config().get(
+        "stt", {}).get("language", "ru"))
+    compute_type: str = Field(default_factory=lambda: _load_root_config().get(
+        "stt", {}).get("compute_type", "float32"))
+    device: str = Field(default_factory=lambda: _load_root_config().get(
+        "stt", {}).get("device", "cuda"))
+    silero_sensitivity: float = 0.6
+    silero_use_onnx: bool = True
+    silero_deactivity_detection: bool = False
+    post_speech_silence_duration: float = 2.0
+    min_gap_between_recordings: float = 1.0
+    min_length_of_recording: float = 1.0
+    pre_recording_buffer_duration: float = 0.2
+    no_log_file: bool = True
+    spinner: bool = False
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -321,6 +378,8 @@ class Settings(BaseModel):
     system_toggle: SystemToggleSettings = SystemToggleSettings()
     trash_tool: TrashToolSettings = TrashToolSettings()
     logging: LoggingSettings = LoggingSettings()
+    llm: LLMSettings = LLMSettings()
+    stt: STTSettings = STTSettings()
 
 
 settings = Settings()

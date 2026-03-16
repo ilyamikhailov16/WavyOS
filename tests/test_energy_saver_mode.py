@@ -1,6 +1,6 @@
 import subprocess
 
-import energy_saver_mode as module
+from scripts import energy_saver_mode as module
 
 
 def test_open_system_settings_uses_configured_uri(monkeypatch) -> None:

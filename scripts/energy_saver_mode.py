@@ -4,11 +4,10 @@ import ctypes
 import subprocess
 from ctypes import wintypes
 from pathlib import Path
-
 import keyboard
 
-from bootstrap import settings
 from app_logging import get_logger
+from config import settings
 
 ENERGY_SAVER_SETTINGS = settings.energy_saver
 user32 = ctypes.windll.user32

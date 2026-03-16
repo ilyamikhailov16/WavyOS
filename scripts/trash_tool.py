@@ -5,8 +5,8 @@ import keyboard
 import send2trash
 import win32com.shell.shell as shell
 
-from bootstrap import settings
 from app_logging import get_logger
+from config import settings
 
 TRASH_TOOL_SETTINGS = settings.trash_tool
 logger = get_logger(__name__)

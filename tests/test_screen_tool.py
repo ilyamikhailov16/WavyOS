@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import screen_tool as module
+from scripts import screen_tool as module
 
 
 def test_take_screenshot_saves_file(monkeypatch, tmp_path) -> None:
