@@ -1,7 +1,7 @@
 import json
 from functools import lru_cache
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class TimeoutsSettings(BaseModel):
@@ -22,28 +22,24 @@ class SearchPresetSettings(BaseModel):
 class BrowserPathsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    opera: list[str] = Field(
-        default_factory=lambda: [
-            "~/AppData/Local/Programs/Opera/opera.exe",
-            "~/AppData/Local/Programs/Opera/launcher.exe",
-            "~/AppData/Local/Programs/Opera GX/launcher.exe",
-            "C:/Program Files/Opera/opera.exe",
-            "C:/Program Files/Opera/launcher.exe",
-            "C:/Program Files/Opera GX/opera.exe",
-            "C:/Program Files/Opera GX/launcher.exe",
-            "C:/Program Files (x86)/Opera/opera.exe",
-            "C:/Program Files (x86)/Opera/launcher.exe",
-            "C:/Program Files (x86)/Opera GX/opera.exe",
-            "C:/Program Files (x86)/Opera GX/launcher.exe",
-        ]
-    )
-    yandex: list[str] = Field(
-        default_factory=lambda: [
-            "~/AppData/Local/Yandex/YandexBrowser/Application/browser.exe",
-            "C:/Program Files/Yandex/YandexBrowser/Application/browser.exe",
-            "C:/Program Files (x86)/Yandex/YandexBrowser/Application/browser.exe",
-        ]
-    )
+    opera: list[str] = [
+        "~/AppData/Local/Programs/Opera/opera.exe",
+        "~/AppData/Local/Programs/Opera/launcher.exe",
+        "~/AppData/Local/Programs/Opera GX/launcher.exe",
+        "C:/Program Files/Opera/opera.exe",
+        "C:/Program Files/Opera/launcher.exe",
+        "C:/Program Files/Opera GX/opera.exe",
+        "C:/Program Files/Opera GX/launcher.exe",
+        "C:/Program Files (x86)/Opera/opera.exe",
+        "C:/Program Files (x86)/Opera/launcher.exe",
+        "C:/Program Files (x86)/Opera GX/opera.exe",
+        "C:/Program Files (x86)/Opera GX/launcher.exe",
+    ]
+    yandex: list[str] = [
+        "~/AppData/Local/Yandex/YandexBrowser/Application/browser.exe",
+        "C:/Program Files/Yandex/YandexBrowser/Application/browser.exe",
+        "C:/Program Files (x86)/Yandex/YandexBrowser/Application/browser.exe",
+    ]
 
     def for_browser(self, browser_name: str) -> list[Path]:
         raw_paths = getattr(self, browser_name, [])
@@ -53,16 +49,17 @@ class BrowserPathsSettings(BaseModel):
 class ProcessNamesSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    chromium: set[str] = Field(
-        default_factory=lambda: {"chrome.exe",
-                                 "msedge.exe", "opera.exe", "browser.exe"}
-    )
-    chrome: set[str] = Field(default_factory=lambda: {"chrome.exe"})
-    edge: set[str] = Field(default_factory=lambda: {"msedge.exe"})
-    firefox: set[str] = Field(default_factory=lambda: {"firefox.exe"})
-    opera: set[str] = Field(default_factory=lambda: {
-                            "opera.exe", "launcher.exe"})
-    yandex: set[str] = Field(default_factory=lambda: {"browser.exe"})
+    chromium: set[str] = {
+        "chrome.exe",
+        "msedge.exe",
+        "opera.exe",
+        "browser.exe",
+    }
+    chrome: set[str] = {"chrome.exe"}
+    edge: set[str] = {"msedge.exe"}
+    firefox: set[str] = {"firefox.exe"}
+    opera: set[str] = {"opera.exe", "launcher.exe"}
+    yandex: set[str] = {"browser.exe"}
 
     def for_browser(self, browser_name: str) -> set[str]:
         return set(getattr(self, browser_name, set()))
@@ -107,14 +104,12 @@ class BrowserRegistrySettings(BaseModel):
     default_browser_progid_key: str = (
         r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice"
     )
-    progid_to_browser: dict[str, str] = Field(
-        default_factory=lambda: {
-            "MSEdgeHTM": "edge",
-            "ChromeHTML": "chrome",
-            "FirefoxURL": "firefox",
-            "FirefoxHTML": "firefox",
-        }
-    )
+    progid_to_browser: dict[str, str] = {
+        "MSEdgeHTM": "edge",
+        "ChromeHTML": "chrome",
+        "FirefoxURL": "firefox",
+        "FirefoxHTML": "firefox",
+    }
 
 
 class BrowserRuntimeSettings(BaseModel):
@@ -130,30 +125,24 @@ class BrowserRuntimeSettings(BaseModel):
         "opera",
         "yandex",
     )
-    display_names: dict[str, str] = Field(
-        default_factory=lambda: {
-            "chromium": "Playwright Chromium",
-            "firefox": "Playwright Firefox",
-            "webkit": "Playwright WebKit",
-            "chrome": "Google Chrome",
-            "edge": "Microsoft Edge",
-            "opera": "Opera",
-            "yandex": "Yandex Browser",
-        }
-    )
-    launch_commands: dict[str, list[str]] = Field(
-        default_factory=lambda: {
-            "chrome": ["cmd", "/c", "start", "chrome"],
-            "edge": ["cmd", "/c", "start", "msedge"],
-            "firefox": ["cmd", "/c", "start", "firefox"],
-        }
-    )
-    playwright_channels: dict[str, str] = Field(
-        default_factory=lambda: {
-            "chrome": "chrome",
-            "edge": "msedge",
-        }
-    )
+    display_names: dict[str, str] = {
+        "chromium": "Playwright Chromium",
+        "firefox": "Playwright Firefox",
+        "webkit": "Playwright WebKit",
+        "chrome": "Google Chrome",
+        "edge": "Microsoft Edge",
+        "opera": "Opera",
+        "yandex": "Yandex Browser",
+    }
+    launch_commands: dict[str, list[str]] = {
+        "chrome": ["cmd", "/c", "start", "chrome"],
+        "edge": ["cmd", "/c", "start", "msedge"],
+        "firefox": ["cmd", "/c", "start", "firefox"],
+    }
+    playwright_channels: dict[str, str] = {
+        "chrome": "chrome",
+        "edge": "msedge",
+    }
 
     def display_name_for(self, browser_name: str) -> str:
         return self.display_names.get(browser_name, browser_name)
@@ -331,32 +320,26 @@ def _load_root_config() -> dict:
 class LLMSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    use_for_stt: bool = Field(
-        default_factory=lambda: _load_root_config().get("use_llm_for_stt", False))
-    base_url: str = Field(
-        default_factory=lambda: _load_root_config().get("api", {}).get("base_url", "https://openrouter.ai/api/v1")
+    use_for_stt: bool = _load_root_config().get("use_llm_for_stt", False)
+    base_url: str = _load_root_config().get("api", {}).get(
+        "base_url", "https://openrouter.ai/api/v1"
     )
-    token: str = Field(
-        default_factory=lambda: _load_root_config().get("api", {}).get(
-            "token", "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")
+    token: str = _load_root_config().get("api", {}).get(
+        "token",
+        "",
     )
-    model: str = Field(
-        default_factory=lambda: _load_root_config().get(
-            "api", {}).get("model", "openrouter/free")
-    )
+    model: str = _load_root_config().get("api", {}).get("model", "openrouter/free")
 
 
 class STTSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    model: str = Field(default_factory=lambda: _load_root_config().get(
-        "stt", {}).get("model", "medium"))
-    language: str = Field(default_factory=lambda: _load_root_config().get(
-        "stt", {}).get("language", "ru"))
-    compute_type: str = Field(default_factory=lambda: _load_root_config().get(
-        "stt", {}).get("compute_type", "float32"))
-    device: str = Field(default_factory=lambda: _load_root_config().get(
-        "stt", {}).get("device", "cuda"))
+    model: str = _load_root_config().get("stt", {}).get("model", "medium")
+    language: str = _load_root_config().get("stt", {}).get("language", "ru")
+    compute_type: str = _load_root_config().get("stt", {}).get(
+        "compute_type", "float32"
+    )
+    device: str = _load_root_config().get("stt", {}).get("device", "cuda")
     silero_sensitivity: float = 0.6
     silero_use_onnx: bool = True
     silero_deactivity_detection: bool = False
