@@ -20,7 +20,9 @@ AUDIO_RECORDER_PARAMS = {
     "pre_recording_buffer_duration": 0.2,
     "no_log_file": True,
     "spinner": True,  # Provides a spinner animation
+    "device": "cuda",
 }
+USE_LLM = True
 API_KEY = ""
 MODEL_OPENROUTER_PATH = "openai/gpt-oss-20b"
 COMMAND_POOL = {"Очистить корзину": empty_recycle_bin, "Скриншот": take_screenshot}
