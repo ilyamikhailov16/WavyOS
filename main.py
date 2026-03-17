@@ -86,11 +86,9 @@ class App:
             return
 
         self.stop_event.set()
-
-        if self.recorder_thread:
-            self.recorder_thread.join()
-        if self.loop_thread:
-            self.loop_thread.join()
+        
+        self.recorder_thread.join()
+        self.loop_thread.join()
 
 
 if __name__ == "__main__":
