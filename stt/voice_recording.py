@@ -35,11 +35,14 @@ def run_audio_recorder(
             queue.put(text)
         except Exception:
             logger.exception("Exception in STT callback")
-
-    def on_vad_detect_start() -> None:
-        logger.info("VAD: you can speek")
     
-    with AudioToTextRecorder(**kwargs, on_vad_detect_start=on_vad_detect_start) as recorder:
+    with AudioToTextRecorder(
+        **kwargs, 
+        on_vad_detect_start=lambda: logger.info("VAD: you can speek"), 
+        on_recording_start=lambda: logger.info("recording start"), 
+        on_recording_stop=lambda: logger.info("recording stop"),
+        on_transcription_start=lambda x: logger.info("transcription start"),
+    ) as recorder:
         while not stop_event.is_set():
             recorder.text(callback)
 

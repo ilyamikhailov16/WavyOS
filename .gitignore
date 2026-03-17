@@ -56,3 +56,6 @@ screenshot_*.png
 user-data/
 browser-profile/
 downloads/
+
+# API key
+token.txt
