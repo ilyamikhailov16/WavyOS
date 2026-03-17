@@ -1,6 +1,6 @@
 import subprocess
 
-from scripts import script_runner as module
+import scripts.script_runner as module
 
 
 def test_run_script_rejects_non_python_files(monkeypatch) -> None:

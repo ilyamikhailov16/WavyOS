@@ -1,13 +1,21 @@
 """Real-time voice recording and receiving the recorded text in the main stream functionality."""
 
+import logging
 import queue as q
 import threading as th
-import traceback
-from typing import Callable
+from typing import Callable, Optional
 from RealtimeSTT import AudioToTextRecorder
 
+from app_logging import get_logger
+logger: logging.Logger = get_logger(__name__)
 
-def run_audio_recorder(stop_event: th.Event, queue: q.Queue, process_text_func: Callable, **kwargs) -> None:
+
+def run_audio_recorder(
+    stop_event: th.Event,
+    queue: Optional[q.Queue[str]],
+    process_text_func: Optional[Callable[[str], Optional[str]]],
+    **kwargs,
+) -> None:
     """
     Starts AudioToTextRecorder to recognize speech and convert it to text.
     Activated by voice and stops recording after a certain length of silence at the end of a speech.
@@ -15,20 +23,32 @@ def run_audio_recorder(stop_event: th.Event, queue: q.Queue, process_text_func: 
     """
     def callback(text: str) -> None:
         try:
-            if queue is not None:
-                if process_text_func is not None:
-                    text = process_text_func(text)
-                queue.put(text)
-        except Exception as e:
-            print(f"[stt.callback] Exception: {e}")
-            print(traceback.format_exc())
+            if queue is None:
+                return
+
+            if process_text_func is not None:
+                text = process_text_func(text)
+                if text is None:
+                    logger.info("The message was not processed by the processor and was ignored")
+                    return
+
+            queue.put(text)
+        except Exception:
+            logger.exception("Exception in STT callback")
+
+    def on_vad_detect_start() -> None:
+        logger.info("VAD: you can speek")
     
-    with AudioToTextRecorder(**kwargs) as recorder:
+    with AudioToTextRecorder(**kwargs, on_vad_detect_start=on_vad_detect_start) as recorder:
         while not stop_event.is_set():
             recorder.text(callback)
 
 
-def run_voice_processing(audio_recorder_params: dict, queue: q.Queue = None, process_text_func: Callable = None) -> tuple[th.Event, th.Thread]:
+def run_voice_processing(
+    audio_recorder_params: dict,
+    queue: Optional[q.Queue[str]] = None,
+    process_text_func: Optional[Callable[[str], Optional[str]]] = None,
+) -> tuple[th.Event, th.Thread]:
     """
     Runs the voice processing thread.
     """

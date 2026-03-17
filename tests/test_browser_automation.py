@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from scripts import browser_automation as module
+import scripts.browser_automation as module
 
 
 def make_args(**overrides):
