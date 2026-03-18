@@ -1,6 +1,7 @@
 import json
 from functools import lru_cache
 from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -296,6 +297,66 @@ class TrashToolSettings(BaseModel):
     paths: TrashToolPathsSettings = TrashToolPathsSettings()
 
 
+class DesktopManagerSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    registry_key: str = (
+        r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+    )
+    registry_value: str = "Desktop"
+    fallback_folder: str = "Desktop"
+    file_encoding: str = "utf-8"
+
+
+class AppManagerSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    registry_uninstall_paths: list[tuple[str, str]] = [
+        (r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM"),
+        (r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", "HKLM"),
+        (r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "HKCU"),
+    ]
+    skip_exe_names: tuple[str, ...] = (
+        "uninst",
+        "setup",
+        "install",
+        "update",
+        "crash",
+        "squirrel",
+    )
+    winget_timeout_s: int = 120
+    uninstall_timeout_s: int = 120
+    launch_wait_s: float = 1.0
+    subprocess_encoding: str = "utf-8"
+
+    # Нестандартный запуск: алиас → (путь_к_exe_с_%ENV%, аргументы).
+    # Используется для приложений, которые нельзя запустить напрямую.
+    special_launch: dict[str, tuple[str, list[str]]] = {
+        "roblox": (r"%LOCALAPPDATA%\Roblox\Versions\RobloxPlayerLauncher.exe", []),
+        "роблокс": (r"%LOCALAPPDATA%\Roblox\Versions\RobloxPlayerLauncher.exe", []),
+        "roblox studio": (
+            r"%LOCALAPPDATA%\Roblox\Versions\RobloxStudioLauncher.exe",
+            [],
+        ),
+    }
+
+    # Известные пути для приложений, не регистрирующихся в стандартных кустах реестра.
+    # Ключ — app_name.lower(), значение — список путей (проверяется первый существующий).
+    known_paths: dict[str, list[str]] = {
+        "steam": [
+            r"C:\Program Files (x86)\Steam\steam.exe",
+            r"C:\Program Files\Steam\steam.exe",
+        ],
+        "стим": [
+            r"C:\Program Files (x86)\Steam\steam.exe",
+            r"C:\Program Files\Steam\steam.exe",
+        ],
+        "riot client": [
+            r"C:\Riot Games\Riot Client\RiotClientServices.exe",
+        ],
+    }
+
+
 class LoggingSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -321,12 +382,18 @@ class LLMSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     use_for_stt: bool = _load_root_config().get("use_llm_for_stt", False)
-    base_url: str = _load_root_config().get("api", {}).get(
-        "base_url", "https://openrouter.ai/api/v1"
+    base_url: str = (
+        _load_root_config()
+        .get("api", {})
+        .get("base_url", "https://openrouter.ai/api/v1")
     )
-    token: str = _load_root_config().get("api", {}).get(
-        "token",
-        "",
+    token: str = (
+        _load_root_config()
+        .get("api", {})
+        .get(
+            "token",
+            "",
+        )
     )
     model: str = _load_root_config().get("api", {}).get("model", "openrouter/free")
 
@@ -336,8 +403,8 @@ class STTSettings(BaseModel):
 
     model: str = _load_root_config().get("stt", {}).get("model", "medium")
     language: str = _load_root_config().get("stt", {}).get("language", "ru")
-    compute_type: str = _load_root_config().get("stt", {}).get(
-        "compute_type", "float32"
+    compute_type: str = (
+        _load_root_config().get("stt", {}).get("compute_type", "float32")
     )
     device: str = _load_root_config().get("stt", {}).get("device", "cuda")
     silero_sensitivity: float = 0.6
@@ -360,6 +427,8 @@ class Settings(BaseModel):
     energy_saver: EnergySaverSettings = EnergySaverSettings()
     system_toggle: SystemToggleSettings = SystemToggleSettings()
     trash_tool: TrashToolSettings = TrashToolSettings()
+    desktop_manager: DesktopManagerSettings = DesktopManagerSettings()
+    app_manager: AppManagerSettings = AppManagerSettings()
     logging: LoggingSettings = LoggingSettings()
     llm: LLMSettings = LLMSettings()
     stt: STTSettings = STTSettings()
