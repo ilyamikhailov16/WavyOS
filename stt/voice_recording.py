@@ -7,6 +7,7 @@ from typing import Callable, Optional
 from RealtimeSTT import AudioToTextRecorder
 
 from app_logging import get_logger
+
 logger: logging.Logger = get_logger(__name__)
 
 
@@ -21,6 +22,7 @@ def run_audio_recorder(
     Activated by voice and stops recording after a certain length of silence at the end of a speech.
     Designed to work in a separate thread, so it waits for a stop_event.
     """
+
     def callback(text: str) -> None:
         try:
             if queue is None:
@@ -29,17 +31,19 @@ def run_audio_recorder(
             if process_text_func is not None:
                 text = process_text_func(text)
                 if text is None:
-                    logger.info("The message was not processed by the processor and was ignored")
+                    logger.info(
+                        "The message was not processed by the processor and was ignored"
+                    )
                     return
 
             queue.put(text)
         except Exception:
             logger.exception("Exception in STT callback")
-    
+
     with AudioToTextRecorder(
-        **kwargs, 
-        on_vad_detect_start=lambda: logger.info("VAD: you can speek"), 
-        on_recording_start=lambda: logger.info("recording start"), 
+        **kwargs,
+        on_vad_detect_start=lambda: logger.info("VAD: you can speek"),
+        on_recording_start=lambda: logger.info("recording start"),
         on_recording_stop=lambda: logger.info("recording stop"),
         on_transcription_start=lambda x: logger.info("transcription start"),
     ) as recorder:
@@ -58,9 +62,9 @@ def run_voice_processing(
 
     stop_event = th.Event()
     recorder_thread = th.Thread(
-        target=run_audio_recorder, 
+        target=run_audio_recorder,
         args=(stop_event, queue, process_text_func),
-        kwargs=audio_recorder_params, 
+        kwargs=audio_recorder_params,
     )
     recorder_thread.start()
     return stop_event, recorder_thread

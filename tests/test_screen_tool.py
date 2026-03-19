@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import scripts.screen_tool as module
 
 

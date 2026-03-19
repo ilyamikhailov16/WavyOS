@@ -13,6 +13,7 @@ from command_registry import COMMAND_POOL
 logger: logging.Logger = get_logger(__name__)
 # logging.getLogger().setLevel(logging.ERROR)
 
+
 class App:
     """Main application runner for speech-to-command processing."""
 
@@ -77,16 +78,18 @@ class App:
         self.stop_event, self.recorder_thread = run_voice_processing(
             self.cfg.stt.model_dump(), self.queue, self.text_processor
         )
-        self.stop_event, self.loop_thread = self._run_loop_in_thread(self.stop_event, self.queue)
+        self.stop_event, self.loop_thread = self._run_loop_in_thread(
+            self.stop_event, self.queue
+        )
 
     def stop(self) -> None:
         """Request shutdown and wait for worker threads to finish."""
-        
+
         if not self.stop_event:
             return
 
         self.stop_event.set()
-        
+
         self.recorder_thread.join()
         self.loop_thread.join()
 
@@ -94,5 +97,3 @@ class App:
 if __name__ == "__main__":
     app = App(settings, COMMAND_POOL)
     app.start()
-
-

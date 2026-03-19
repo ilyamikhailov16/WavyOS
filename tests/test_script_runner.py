@@ -1,5 +1,3 @@
-import subprocess
-
 import scripts.script_runner as module
 
 

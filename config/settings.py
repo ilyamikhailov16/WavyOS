@@ -329,8 +329,8 @@ class AppManagerSettings(BaseModel):
     launch_wait_s: float = 1.0
     subprocess_encoding: str = "utf-8"
 
-    # Нестандартный запуск: алиас → (путь_к_exe_с_%ENV%, аргументы).
-    # Используется для приложений, которые нельзя запустить напрямую.
+    # Custom launch: alias → (path_to_exe_with_%ENV%, arguments).
+    # Used for applications that cannot be launched directly.
     special_launch: dict[str, tuple[str, list[str]]] = {
         "roblox": (r"%LOCALAPPDATA%\Roblox\Versions\RobloxPlayerLauncher.exe", []),
         "роблокс": (r"%LOCALAPPDATA%\Roblox\Versions\RobloxPlayerLauncher.exe", []),
@@ -340,8 +340,8 @@ class AppManagerSettings(BaseModel):
         ),
     }
 
-    # Известные пути для приложений, не регистрирующихся в стандартных кустах реестра.
-    # Ключ — app_name.lower(), значение — список путей (проверяется первый существующий).
+    # Known paths for applications that do not register in standard registry hives.
+    # Key — app_name.lower(), value — list of paths (first existing one is used).
     known_paths: dict[str, list[str]] = {
         "steam": [
             r"C:\Program Files (x86)\Steam\steam.exe",

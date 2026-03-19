@@ -3,6 +3,7 @@ from config import settings
 
 _CONFIGURED = False
 
+
 def configure_logging() -> None:
     global _CONFIGURED
     if _CONFIGURED:

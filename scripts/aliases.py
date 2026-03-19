@@ -1,17 +1,17 @@
 """
-Словари алиасов и вспомогательные данные для AppManager.
+Alias dictionaries and auxiliary data for AppManager.
 
-  APP_ALIASES          — системные утилиты Windows → .exe из PATH
-  APP_PROTOCOL_ALIASES — URI-протоколы (ms-settings:, epic://, …)
-  APP_SPECIAL_LAUNCH   — нестандартный запуск (Valorant, Roblox)
-  APP_CONSOLE_APPS     — .exe требующие CREATE_NEW_CONSOLE
-  APP_KNOWN_PATHS      — пути для приложений вне реестра (Steam)
-  APP_NAME_ALIASES     — алиасы → DisplayName в реестре
-  TRANSLITERATION      — таблица ru→en (авто-резолв русских названий)
+  APP_ALIASES          — Windows system utilities → .exe from PATH
+  APP_PROTOCOL_ALIASES — URI protocols (ms-settings:, epic://, …)
+  APP_SPECIAL_LAUNCH   — custom launch (Valorant, Roblox)
+  APP_CONSOLE_APPS     — .exe requiring CREATE_NEW_CONSOLE
+  APP_KNOWN_PATHS      — paths for applications outside the registry (Steam)
+  APP_NAME_ALIASES     — aliases → DisplayName in registry
+  TRANSLITERATION      — ru→en table (auto-resolving Russian names)
 """
 
 # ---------------------------------------------------------------------------
-# Системные утилиты Windows
+# Windows system utilities
 # ---------------------------------------------------------------------------
 
 APP_ALIASES: dict[str, str] = {
@@ -35,7 +35,7 @@ APP_ALIASES: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# URI-протоколы — открываются через os.startfile()
+# URI-protocols — can be opened with os.startfile()
 # ---------------------------------------------------------------------------
 
 APP_PROTOCOL_ALIASES: dict[str, str] = {
@@ -52,7 +52,7 @@ APP_PROTOCOL_ALIASES: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Консольные приложения — требуют CREATE_NEW_CONSOLE
+# Console application — require CREATE_NEW_CONSOLE
 # ---------------------------------------------------------------------------
 
 APP_CONSOLE_APPS: frozenset[str] = frozenset(
@@ -68,11 +68,11 @@ APP_CONSOLE_APPS: frozenset[str] = frozenset(
 )
 
 # ---------------------------------------------------------------------------
-# Сторонние приложения — алиас → DisplayName в реестре
+# Other application — alias → DisplayName in register
 # ---------------------------------------------------------------------------
 
 APP_NAME_ALIASES: dict[str, str] = {
-    # Браузеры
+    # Browsers
     "хром": "Google Chrome",
     "chrome": "Google Chrome",
     "гугл хром": "Google Chrome",
@@ -80,15 +80,15 @@ APP_NAME_ALIASES: dict[str, str] = {
     "firefox": "Mozilla Firefox",
     "эдж": "Microsoft Edge",
     "edge": "Microsoft Edge",
-    # Мессенджеры
+    # Messengers
     "телеграм": "Telegram",
     "telegram": "Telegram",
     "дискорд": "Discord",
     "discord": "Discord",
-    # Медиа
+    # Media
     "спотифай": "Spotify",
     "spotify": "Spotify",
-    # Разработка
+    # Development
     "vs code": "Microsoft Visual Studio Code",
     "vscode": "Microsoft Visual Studio Code",
     "code": "Microsoft Visual Studio Code",
@@ -97,8 +97,8 @@ APP_NAME_ALIASES: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
-# Транслитерация ru → en
-# Позволяет автоматически разрешать русские названия без ручных алиасов.
+# Transliteration ru → en
+# Allows Russian names to be resolved automatically without manual aliases.
 # "стим" → "stim" → fuzzy-поиск → "steam"
 # ---------------------------------------------------------------------------
 
@@ -140,5 +140,5 @@ TRANSLITERATION: dict[str, str] = {
 
 
 def transliterate(text: str) -> str:
-    """Транслитерирует русский текст в латиницу."""
+    """Transliterates Russian text into the Latin alphabet."""
     return "".join(TRANSLITERATION.get(ch, ch) for ch in text.lower())

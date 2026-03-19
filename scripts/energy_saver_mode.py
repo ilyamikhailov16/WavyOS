@@ -3,7 +3,6 @@
 import ctypes
 import subprocess
 from ctypes import wintypes
-from pathlib import Path
 import keyboard
 
 from app_logging import get_logger

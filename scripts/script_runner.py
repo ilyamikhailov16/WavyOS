@@ -110,6 +110,6 @@ if __name__ == "__main__":
         keyboard.add_hotkey(SCRIPT_RUNNER_SETTINGS.hotkeys.run_dummy, run_dummy)
         keyboard.wait(SCRIPT_RUNNER_SETTINGS.hotkeys.exit)
 
-        logger.info("Выход...")
+        logger.info("Exiting...")
 
     hotkeys()

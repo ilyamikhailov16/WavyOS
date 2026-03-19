@@ -1,5 +1,3 @@
-import pathlib
-
 import scripts.trash_tool as module
 
 

@@ -5,21 +5,21 @@ import platform
 
 
 def shutdown():
-    """ Выключает пк """
+    """Shuts down the computer"""
 
-    if sys.platform.startswith('win'):
+    if sys.platform.startswith("win"):
         os.system("shutdown /s /t 0")
-    elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+    elif sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
         os.system("shutdown now")
     else:
-        print("Неподдерживаемая операционная система")
+        print("Unsupported operating system")
 
 
 def shutdown_with_timer(minutes):
-    """ Выключает пк через указанное количество минут """
+    """Shuts down the computer after the specified number of minutes"""
 
     if minutes < 0:
-        raise ValueError("Время не может быть отрицательным")
+        raise ValueError("Time cannot be negative")
 
     seconds = minutes * 60
 
@@ -35,10 +35,10 @@ def shutdown_with_timer(minutes):
         elif system == "Linux":
             os.system("sudo shutdown now")
         else:
-            print("Неподдерживаемая операционная система")
+            print("Unsupported operating system")
             return
     except KeyboardInterrupt:
-        print("Выключение отменено пользователем")
+        print("Shutdown cancelled by user")
         if system == "Windows":
             os.system("shutdown /a")
         sys.exit(0)

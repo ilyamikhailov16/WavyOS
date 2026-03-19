@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Вспомогательные типы
+# Helper types
 # ---------------------------------------------------------------------------
 
 
@@ -30,7 +30,7 @@ class OperationStatus(str, Enum):
 
 @dataclass
 class OperationResult:
-    """Унифицированный ответ каждого метода."""
+    """Unified response returned by each method."""
 
     status: OperationStatus
     message: str
@@ -48,14 +48,14 @@ class OperationResult:
 
 
 # ---------------------------------------------------------------------------
-# Определение пути к рабочему столу
+# Resolving desktop path
 # ---------------------------------------------------------------------------
 
 
 def _resolve_desktop() -> Path:
     """
-    Определение пути к рабочему столу через реестр Windows.
-    Fallback — ~/Desktop, если реестр недоступен.
+    Resolve the desktop path using the Windows registry.
+    Fallback — ~/Desktop if the registry is unavailable.
     """
     cfg = settings.desktop_manager
     try:
@@ -72,38 +72,38 @@ def _resolve_desktop() -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Основной класс
+# Main class
 # ---------------------------------------------------------------------------
 
 
 class DesktopManager:
     """
-    Управление файлами и папками на рабочем столе пользователя.
+    Manage files and folders on the user's desktop.
 
-    Каждый публичный метод возвращает :class:`OperationResult`.
+    Each public method returns an :class:`OperationResult`.
     """
 
     def __init__(self, desktop_path: Path | str | None = None) -> None:
         """
         Args:
-            desktop_path: Явный путь к рабочему столу (для тестов или кастомных сред).
-                          Если None — определяется автоматически.
+            desktop_path: Explicit path to the desktop (for tests or custom environments).
+                          If None — it is resolved automatically.
         """
         self.desktop: Path = Path(desktop_path) if desktop_path else _resolve_desktop()
-        logger.info("DesktopManager инициализирован. Рабочий стол: %s", self.desktop)
+        logger.info("DesktopManager initialized. Desktop path: %s", self.desktop)
 
     # ------------------------------------------------------------------
-    # Приватные утилиты
+    # Private utilities
     # ------------------------------------------------------------------
 
     def _safe_path(self, name: str, subfolder: str | None = None) -> Path:
-        """Строит абсолютный путь, не выходящий за пределы рабочего стола."""
+        """Builds an absolute path that does not escape the desktop directory."""
         base = (self.desktop / subfolder) if subfolder else self.desktop
         target = (base / name).resolve()
 
-        # Защита от path-traversal атак
+        # Protection against path-traversal attacks
         if not str(target).startswith(str(self.desktop.resolve())):
-            raise ValueError(f"Путь '{target}' выходит за пределы рабочего стола.")
+            raise ValueError(f"Path '{target}' is outside the desktop directory.")
 
         return target
 
@@ -120,25 +120,25 @@ class DesktopManager:
         )
 
     # ------------------------------------------------------------------
-    # Публичный API
+    # Public API
     # ------------------------------------------------------------------
 
     def create_folder(self, name: str) -> OperationResult:
         """
-        Создать папку на рабочем столе.
+        Create a folder on the desktop.
 
         Args:
-            name: Имя папки (разрешен вложенный путь).
+            name: Folder name (nested paths are allowed).
 
         Returns:
-            OperationResult с полем data["path"].
+            OperationResult with data["path"] field.
         """
         try:
             path = self._safe_path(name)
             path.mkdir(parents=True, exist_ok=True)
-            return self._ok(f"Папка '{name}' создана.", path=str(path))
+            return self._ok(f"Folder '{name}' created.", path=str(path))
         except (ValueError, OSError) as exc:
-            return self._err(f"Ошибка при создании папки '{name}': {exc}")
+            return self._err(f"Error creating folder '{name}': {exc}")
 
     def create_file(
         self,
@@ -148,29 +148,29 @@ class DesktopManager:
         overwrite: bool = False,
     ) -> OperationResult:
         """
-        Создать текстовый файл на рабочем столе или в указанной папке.
+        Create a text file on the desktop or in the specified folder.
 
         Args:
-            filename: Имя файла с расширением (напр. "x.txt").
-            content:  Текстовое содержимое файла.
-            folder:   Подпапка на рабочем столе (необязательно).
-            overwrite: Перезаписать файл, если он уже существует.
+            filename: File name with extension (e.g., "x.txt").
+            content:  Text content of the file.
+            folder:   Subfolder on the desktop (optional).
+            overwrite: Overwrite the file if it already exists.
 
         Returns:
-            OperationResult с полем data["path"].
+            OperationResult with data["path"] field.
         """
         try:
             path = self._safe_path(filename, subfolder=folder)
             if path.exists() and not overwrite:
                 return self._err(
-                    f"Файл '{filename}' уже существует. Передайте overwrite=True для перезаписи.",
+                    f"File '{filename}' already exists. Pass overwrite=True to overwrite.",
                     path=str(path),
                 )
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding=settings.desktop_manager.file_encoding)
-            return self._ok(f"Файл '{filename}' создан.", path=str(path))
+            return self._ok(f"File '{filename}' created.", path=str(path))
         except (ValueError, OSError) as exc:
-            return self._err(f"Ошибка при создании файла '{filename}': {exc}")
+            return self._err(f"Error creating file '{filename}': {exc}")
 
     def create_json_file(
         self,
@@ -180,98 +180,98 @@ class DesktopManager:
         overwrite: bool = False,
     ) -> OperationResult:
         """
-        Создать JSON-файл.
+        Create a JSON file.
 
         Args:
-            filename: Имя файла (напр. "config.json").
-            data:     Словарь для сериализации.
-            folder:   Подпапка на рабочем столе (необязательно).
-            overwrite: Перезаписать файл, если он уже существует.
+            filename: File name (e.g., "config.json").
+            data:     Dictionary to serialize.
+            folder:   Subfolder on the desktop (optional).
+            overwrite: Overwrite the file if it already exists.
         """
         content = json.dumps(data, ensure_ascii=False, indent=2)
         return self.create_file(filename, content, folder=folder, overwrite=overwrite)
 
     def read_file(self, filename: str, folder: str | None = None) -> OperationResult:
         """
-        Прочитать содержимое текстового файла.
+        Read the contents of a text file.
 
         Returns:
-            OperationResult с полем data["content"].
+            OperationResult with data["content"] field.
         """
         try:
             path = self._safe_path(filename, subfolder=folder)
             if not path.is_file():
-                return self._err(f"Файл '{filename}' не найден.", path=str(path))
+                return self._err(f"File '{filename}' not found.", path=str(path))
             content = path.read_text(encoding=settings.desktop_manager.file_encoding)
             return self._ok(
-                f"Файл '{filename}' прочитан.", content=content, path=str(path)
+                f"File '{filename}' read.", content=content, path=str(path)
             )
         except (ValueError, OSError) as exc:
-            return self._err(f"Ошибка чтения файла '{filename}': {exc}")
+            return self._err(f"Error reading file '{filename}': {exc}")
 
     def delete(self, name: str, folder: str | None = None) -> OperationResult:
         """
-        Удалить файл или папку (папка удаляется рекурсивно).
+        Delete a file or folder (folders are removed recursively).
 
         Args:
-            name:   Имя файла или папки.
-            folder: Подпапка, в которой находится объект (необязательно).
+            name:   File or folder name.
+            folder: Subfolder where the item is located (optional).
         """
         try:
             path = self._safe_path(name, subfolder=folder)
             if not path.exists():
-                return self._err(f"'{name}' не существует.", path=str(path))
+                return self._err(f"'{name}' does not exist.", path=str(path))
             if path.is_dir():
                 shutil.rmtree(path)
-                return self._ok(f"Папка '{name}' удалена.", path=str(path))
+                return self._ok(f"Folder '{name}' deleted.", path=str(path))
             path.unlink()
-            return self._ok(f"Файл '{name}' удалён.", path=str(path))
+            return self._ok(f"File '{name}' deleted.", path=str(path))
         except (ValueError, OSError) as exc:
-            return self._err(f"Ошибка при удалении '{name}': {exc}")
+            return self._err(f"Error deleting '{name}': {exc}")
 
     def rename(
         self, old_name: str, new_name: str, folder: str | None = None
     ) -> OperationResult:
         """
-        Переименовать файл или папку.
+        Rename a file or folder.
 
         Args:
-            old_name: Текущее имя.
-            new_name: Новое имя.
-            folder:   Подпапка (необязательно).
+            old_name: Current name.
+            new_name: New name.
+            folder:   Subfolder (optional).
         """
         try:
             src = self._safe_path(old_name, subfolder=folder)
             dst = self._safe_path(new_name, subfolder=folder)
             if not src.exists():
-                return self._err(f"'{old_name}' не существует.")
+                return self._err(f"'{old_name}' does not exist.")
             if dst.exists():
-                return self._err(f"'{new_name}' уже существует.")
+                return self._err(f"'{new_name}' already exists.")
             src.rename(dst)
-            return self._ok(f"'{old_name}' переименован в '{new_name}'.", path=str(dst))
+            return self._ok(f"'{old_name}' renamed to '{new_name}'.", path=str(dst))
         except (ValueError, OSError) as exc:
-            return self._err(f"Ошибка переименования: {exc}")
+            return self._err(f"Rename error: {exc}")
 
     def list_items(self, folder: str | None = None) -> OperationResult:
         """
-        Получить список файлов и папок.
+        Get a list of files and folders.
 
         Args:
-            folder: Подпапка для просмотра; если None — корень рабочего стола.
+            folder: Subfolder to inspect; if None — desktop root.
 
         Returns:
-            OperationResult с полем data["items"] — список словарей
+            OperationResult with data["items"] — list of dictionaries
             {"name": str, "type": "file"|"folder", "size_bytes": int}.
         """
         try:
             base = self._safe_path(folder) if folder else self.desktop
             if not base.is_dir():
-                return self._err(f"Папка '{folder}' не найдена.")
+                return self._err(f"Folder '{folder}' not found.")
 
             items = []
             for entry in sorted(base.iterdir()):
                 if entry.name.startswith("."):
-                    continue  # скрываем служебные файлы
+                    continue  # hide system/hidden files
                 items.append(
                     {
                         "name": entry.name,
@@ -280,21 +280,21 @@ class DesktopManager:
                     }
                 )
             return self._ok(
-                f"Найдено элементов: {len(items)}.",
+                f"Items found: {len(items)}.",
                 items=items,
                 path=str(base),
             )
         except (ValueError, OSError) as exc:
-            return self._err(f"Ошибка при чтении содержимого: {exc}")
+            return self._err(f"Error reading contents: {exc}")
 
     def get_info(self) -> OperationResult:
         """
-        Вернуть информацию о текущей конфигурации менеджера.
+        Return information about the current manager configuration.
         """
         import sys
 
         return self._ok(
-            "Информация получена.",
+            "Information retrieved.",
             desktop_path=str(self.desktop),
             desktop_exists=self.desktop.exists(),
             python_version=sys.version,
@@ -302,7 +302,7 @@ class DesktopManager:
 
 
 # ---------------------------------------------------------------------------
-# Быстрое тестирование
+# Quick testing
 # ---------------------------------------------------------------------------
 
 # if __name__ == "__main__":

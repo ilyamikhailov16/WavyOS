@@ -25,7 +25,7 @@ from .aliases import (
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Типы
+# Types
 # ---------------------------------------------------------------------------
 
 
@@ -36,7 +36,7 @@ class OperationStatus(str, Enum):
 
 @dataclass
 class OperationResult:
-    """Унифицированный ответ каждого метода — удобен для LLM-парсинга."""
+    """Unified response for every method — convenient for LLM parsing."""
 
     status: OperationStatus
     message: str
@@ -50,32 +50,32 @@ class OperationResult:
 
 
 # ---------------------------------------------------------------------------
-# Основной класс
+# Main class
 # ---------------------------------------------------------------------------
 
 
 def _normalize(text: str) -> str:
-    """Убирает пробелы, дефисы, подчёркивания для fuzzy-сравнения.
+    """Removes spaces, dashes, underscores for fuzzy matching.
     "counter-strike 2" → "counterstrike2", "counter strike" → "counterstrike"
     """
     return _re.sub(r"[\s\-_.]", "", text.lower())
 
 
 def _word_match(key: str, name: str) -> bool:
-    """True если key встречается как отдельное слово (или начало слова) в name."""
+    """True if key appears as a separate word (or prefix of a word) in name."""
     return bool(_re.search(r"\b" + _re.escape(key), name))
 
 
 class AppManager:
     """
-    Управление приложениями: запуск, закрытие, удаление, список процессов.
+    Application management: launch, close, uninstall, process listing.
 
-    При инициализации читает реестр один раз и строит два кеша:
-      _exe_cache:       display_name.lower() → абсолютный путь к .exe
+    On initialization, reads the registry once and builds two caches:
+      _exe_cache:       display_name.lower() → absolute path to .exe
       _uninstall_cache: display_name.lower() → UninstallString
 
-    Все последующие запросы работают через словарь O(1) без обращений к реестру.
-    Каждый публичный метод возвращает :class:`OperationResult`.
+    All subsequent requests work via dictionary O(1) without registry access.
+    Each public method returns :class:`OperationResult`.
     """
 
     def __init__(self) -> None:
@@ -86,7 +86,7 @@ class AppManager:
         self._build_registry_cache()
 
     # ------------------------------------------------------------------
-    # Внутренние утилиты
+    # Internal utilities
     # ------------------------------------------------------------------
 
     def _ok(self, message: str, **data: Any) -> OperationResult:
@@ -99,7 +99,7 @@ class AppManager:
 
     def _run(self, cmd: list[str], timeout: int = 60) -> tuple[int, str, str]:
         """
-        Запускает команду, возвращает (returncode, stdout, stderr).
+        Executes a command, returns (returncode, stdout, stderr).
         """
         try:
             proc = subprocess.Popen(
@@ -118,37 +118,37 @@ class AppManager:
                 return (
                     -1,
                     out.strip() if out else "",
-                    f"Таймаут ({timeout}с): {' '.join(cmd)}",
+                    f"Timeout ({timeout}s): {' '.join(cmd)}",
                 )
         except FileNotFoundError:
-            return -1, "", f"Команда не найдена: {cmd[0]}"
+            return -1, "", f"Command not found: {cmd[0]}"
 
     @staticmethod
     def _to_exe_name(resolved: str) -> str:
-        """Возвращает имя .exe без пути — для поиска в tasklist."""
+        """Returns .exe name without path — for tasklist lookup."""
         name = Path(resolved).name
         return name if name.lower().endswith(".exe") else f"{name}.exe"
 
     def _is_process_running(self, exe_name: str) -> bool:
-        """Проверяет наличие процесса через tasklist /FI."""
+        """Checks process presence via tasklist /FI."""
         code, out, _ = self._run(
             ["tasklist", "/FI", f"IMAGENAME eq {exe_name}", "/FO", "CSV", "/NH"]
         )
         return code == 0 and exe_name.lower() in out.lower()
 
     # ------------------------------------------------------------------
-    # Кеш реестра
+    # Registry cache
     # ------------------------------------------------------------------
 
     def _build_registry_cache(self) -> None:
         """
-        Читает реестр Windows один раз, заполняет _exe_cache и _uninstall_cache.
-        Вызывается при инициализации и после uninstall_app().
+        Reads Windows registry once, fills _exe_cache and _uninstall_cache.
+        Called on initialization and after uninstall_app().
         """
         try:
             import winreg
         except ImportError:
-            logger.warning("winreg недоступен — кеш реестра не построен.")
+            logger.warning("winreg not available — registry cache not built.")
             return
 
         hive_map = {
@@ -167,7 +167,7 @@ class AppManager:
             )
 
         def _find_exe_in_dir(directory: Path, app_lower: str) -> Path | None:
-            """Корень папки, затем один уровень вглубь (Squirrel: app-X.Y.Z/)."""
+            """Root folder, then one level deeper (Squirrel: app-X.Y.Z/)."""
             for exe in sorted(directory.glob("*.exe")):
                 if _valid_exe(exe, app_lower):
                     return exe
@@ -205,13 +205,13 @@ class AppManager:
                         except (OSError, FileNotFoundError):
                             pass
 
-                    # Путь к .exe → _exe_cache
+                    # Path to .exe → _exe_cache
                     if name_key in self._exe_cache:
                         continue
 
                     exe_found: str | None = None
 
-                    # DisplayIcon — самый надёжный источник пути
+                    # DisplayIcon — most reliable source of path
                     try:
                         icon, _ = winreg.QueryValueEx(subkey, "DisplayIcon")
                         candidate = Path(icon.split(",")[0].strip().strip('"'))
@@ -227,7 +227,7 @@ class AppManager:
                     except (OSError, FileNotFoundError):
                         pass
 
-                    # InstallLocation — fallback с поиском в подпапках
+                    # InstallLocation — fallback with subfolder search
                     if not exe_found:
                         try:
                             install_dir, _ = winreg.QueryValueEx(
@@ -250,15 +250,15 @@ class AppManager:
                     continue
 
         logger.info(
-            "Кеш реестра: %d приложений для запуска, %d для удаления.",
+            "Registry cache: %d apps for launch, %d for uninstall.",
             exe_count,
             uninstall_count,
         )
 
     def refresh_registry_cache(self) -> OperationResult:
         """
-        Обновить кеш реестра. Вызывать после установки/удаления приложений.
-        Доступен ИИ-агенту как отдельный инструмент.
+        Refresh registry cache. Call after installing/uninstalling apps.
+        Available to AI agent as a separate tool.
         """
         self._exe_cache.clear()
         self._uninstall_cache.clear()
@@ -266,40 +266,43 @@ class AppManager:
         self._uninstall_norm.clear()
         self._build_registry_cache()
         return self._ok(
-            f"Кеш реестра обновлён: {len(self._exe_cache)} приложений.",
+            f"Registry cache refreshed: {len(self._exe_cache)} apps.",
             exe_count=len(self._exe_cache),
             uninstall_count=len(self._uninstall_cache),
         )
 
     def _lookup_exe(self, app_name: str) -> str | None:
         """
-        Поиск пути к .exe в кеше.
-        Порядок: точное → нормализованное → транслит → word-boundary → подстрока.
+        Search for .exe path in cache.
+        Order: exact → normalized → transliteration → word-boundary → substring.
         """
         key = app_name.lower()
 
-        # 1. Точное
+        # 1. Exact
         if key in self._exe_cache:
             return self._exe_cache[key]
 
-        # 2. Нормализованное (убирает дефисы/пробелы)
+        # 2. Normalized (removes dashes/spaces)
         norm = _normalize(key)
         for n_key, exe in self._exe_norm.items():
             if norm == n_key or norm in n_key:
-                logger.info("Найден в кеше (норм.): '%s' → %s", n_key, exe)
+                logger.info("Found in cache (normalized): '%s' → %s", n_key, exe)
                 return exe
 
-        # 3. Транслитерация → попробуем как norm
+        # 3. Transliteration → try as normalized
         translit = _normalize(transliterate(key))
         if translit != norm:
             for n_key, exe in self._exe_norm.items():
                 if translit == n_key or translit in n_key:
                     logger.info(
-                        "Найден в кеше (транслит '%s'): '%s' → %s", translit, n_key, exe
+                        "Found in cache (translit '%s'): '%s' → %s",
+                        translit,
+                        n_key,
+                        exe,
                     )
                     return exe
 
-        # 4. Word-boundary → выбираем ближайшее по длине
+        # 4. Word-boundary → choose closest by length
         candidates = [(n, e) for n, e in self._exe_cache.items() if _word_match(key, n)]
         if not candidates:
             candidates = [(n, e) for n, e in self._exe_cache.items() if key in n]
@@ -307,13 +310,13 @@ class AppManager:
             best_name, best_exe = min(
                 candidates, key=lambda t: abs(len(t[0]) - len(key))
             )
-            logger.info("Найден в кеше (word): '%s' → %s", best_name, best_exe)
+            logger.info("Found in cache (word): '%s' → %s", best_name, best_exe)
             return best_exe
 
         return None
 
     def _lookup_uninstall_str(self, app_name: str) -> str | None:
-        """Поиск UninstallString. Те же приоритеты что и _lookup_exe."""
+        """Search for UninstallString. Same priority as _lookup_exe."""
         key = app_name.lower()
 
         if key in self._uninstall_cache:
@@ -322,7 +325,7 @@ class AppManager:
         norm = _normalize(key)
         for n_key, us in self._uninstall_norm.items():
             if norm == n_key or norm in n_key:
-                logger.info("Найден UninstallString (норм.): '%s'", n_key)
+                logger.info("Found UninstallString (normalized): '%s'", n_key)
                 return us
 
         translit = _normalize(transliterate(key))
@@ -330,7 +333,7 @@ class AppManager:
             for n_key, us in self._uninstall_norm.items():
                 if translit == n_key or translit in n_key:
                     logger.info(
-                        "Найден UninstallString (транслит '%s'): '%s'", translit, n_key
+                        "Found UninstallString (translit '%s'): '%s'", translit, n_key
                     )
                     return us
 
@@ -343,23 +346,23 @@ class AppManager:
             best_name, best_us = min(
                 candidates, key=lambda t: abs(len(t[0]) - len(key))
             )
-            logger.info("Найден UninstallString (word): '%s'", best_name)
+            logger.info("Found UninstallString (word): '%s'", best_name)
             return best_us
 
         return None
 
     def _resolve_app_name(self, app_name: str) -> str:
         """
-        Резолвит имя/алиас в путь к исполняемому файлу или URI.
+        Resolves name/alias into executable path or URI.
 
-        Приоритет:
-          1. APP_PROTOCOL_ALIASES — URI-протоколы (ms-settings:, epic://, …)
-          2. APP_SPECIAL_LAUNCH   — нестандартный запуск (Roblox, steam://)
-          3. APP_ALIASES          — системные утилиты (notepad, calc, …)
-          4. APP_NAME_ALIASES     — русский алиас → DisplayName → кеш реестра
-          5. Кеш реестра          — нормализованный + транслит + word-boundary
-          6. APP_KNOWN_PATHS      — известные пути вне реестра
-          7. Fallback             — передаём как есть
+        Priority:
+          1. APP_PROTOCOL_ALIASES — URI protocols (ms-settings:, epic://, …)
+          2. APP_SPECIAL_LAUNCH   — special launch logic (Roblox, steam://)
+          3. APP_ALIASES          — system utilities (notepad, calc, …)
+          4. APP_NAME_ALIASES     — localized alias → DisplayName → registry cache
+          5. Registry cache       — normalized + translit + word-boundary
+          6. APP_KNOWN_PATHS      — known paths outside registry
+          7. Fallback             — return as-is
         """
         key = app_name.lower()
 
@@ -384,18 +387,18 @@ class AppManager:
         for path_str in settings.app_manager.known_paths.get(key, []):
             expanded = os.path.expandvars(path_str)
             if Path(expanded).exists():
-                logger.info("Найден по известному пути: %s", expanded)
+                logger.info("Found via known path: %s", expanded)
                 return expanded
 
         return app_name
 
     # ------------------------------------------------------------------
-    # Удаление: внутренняя логика
+    # Uninstall: internal logic
     # ------------------------------------------------------------------
 
     def _uninstall_via_winget(self, app_name: str) -> OperationResult:
-        """Удаление через winget (Win 10+)."""
-        logger.info("Попытка удаления '%s' через winget...", app_name)
+        """Uninstall via winget (Win 10+)."""
+        logger.info("Attempting to uninstall '%s' via winget...", app_name)
         code, out, err = self._run(
             [
                 "winget",
@@ -408,79 +411,80 @@ class AppManager:
             timeout=settings.app_manager.winget_timeout_s,
         )
 
-        # Таймаут → лаунчер открыл диалог подтверждения
+        # Timeout → launcher opened confirmation dialog
         if "таймаут" in err.lower():
             return self._err(
-                f"Удаление '{app_name}' требует подтверждения в стороннем лаунчере. "
-                "Подтвердите удаление в открывшемся окне.",
+                f"Uninstalling '{app_name}' requires confirmation in a launcher. "
+                "Confirm in the opened window.",
                 method="winget",
                 reason="launcher_confirmation_required",
             )
 
         if code != 0:
             return self._err(
-                f"winget не смог удалить '{app_name}': {err or out}",
+                f"winget failed to uninstall '{app_name}': {err or out}",
                 method="winget",
                 returncode=code,
             )
 
-        # Проверяем: запись в кеше ещё есть → удаление не завершено.
+        # Check: still in registry → uninstall not finished
         uninstall_str = self._lookup_uninstall_str(app_name)
         if uninstall_str is not None:
             if "steam://" in uninstall_str.lower():
-                logger.info("Steam-игра — передаём в registry-обработчик.")
+                logger.info("Steam app — delegating to registry handler.")
                 return self._uninstall_via_registry(app_name, uninstall_str)
             return self._err(
-                f"'{app_name}' ещё присутствует в реестре — удаление не завершено. "
-                "Возможно, требуется подтверждение в стороннем лаунчере.",
+                f"'{app_name}' still present in registry — uninstall not completed. "
+                "Launcher confirmation may be required.",
                 method="winget",
                 reason="launcher_confirmation_required",
             )
 
-        return self._ok(f"'{app_name}' успешно удалён.", method="winget", output=out)
+        return self._ok(
+            f"'{app_name}' successfully uninstalled.", method="winget", output=out
+        )
 
     def _uninstall_via_registry(
         self, app_name: str, uninstall_str: str | None = None
     ) -> OperationResult:
         """
-        Fallback: удаление через UninstallString из реестра.
+        Fallback: uninstall via UninstallString from registry.
 
         Args:
-            uninstall_str: Передаётся из _uninstall_via_winget, чтобы не
-                           обращаться к кешу повторно.
+            uninstall_str: Passed from _uninstall_via_winget to avoid re-lookup.
         """
-        logger.info("Попытка удаления '%s' через реестр...", app_name)
+        logger.info("Attempting to uninstall '%s' via registry...", app_name)
 
         uninstall_str = uninstall_str or self._lookup_uninstall_str(app_name)
         if not uninstall_str:
             return self._err(
-                f"'{app_name}' не найден. Возможно, приложение не установлено.",
+                f"'{app_name}' not found. It may not be installed.",
                 method="registry",
             )
 
-        # Steam: URI открывается через обработчик протокола Windows
+        # Steam: URI handled by Windows protocol handler
         if "steam://" in uninstall_str.lower():
             steam_uri = next(
                 (p for p in uninstall_str.split() if p.startswith("steam://")), None
             )
             if not steam_uri:
                 return self._err(
-                    f"Не удалось извлечь steam:// URI из: {uninstall_str}",
+                    f"Failed to extract steam:// URI from: {uninstall_str}",
                     method="registry",
                 )
             try:
                 os.startfile(steam_uri)
                 return self._ok(
-                    f"Запрос удаления '{app_name}' отправлен в Steam. "
-                    "Подтвердите в открывшемся окне.",
+                    f"Uninstall request for '{app_name}' sent to Steam. "
+                    "Confirm in the opened window.",
                     method="registry",
                     reason="launcher_confirmation_required",
                     steam_uri=steam_uri,
                 )
             except OSError as exc:
-                return self._err(f"Не удалось открыть Steam: {exc}", method="registry")
+                return self._err(f"Failed to open Steam: {exc}", method="registry")
 
-        # Парсим строку — shlex корректно обрабатывает пути с пробелами в кавычках
+        # Parse command — shlex handles quoted paths
         try:
             cmd = [c.strip('"') for c in shlex.split(uninstall_str, posix=False)]
         except ValueError:
@@ -489,14 +493,14 @@ class AppManager:
         exe_path = Path(cmd[0])
         if not exe_path.exists():
             return self._err(
-                f"Файл '{exe_path}' не найден — запись в реестре устарела. "
-                "Очистите её через Apps → Installed Apps.",
+                f"File '{exe_path}' not found — registry entry is stale. "
+                "Remove it via Apps → Installed Apps.",
                 method="registry",
                 reason="ghost_registry_entry",
                 uninstall_path=str(exe_path),
             )
 
-        # Флаги тихого удаления по типу установщика
+        # Silent uninstall flags by installer type
         exe_lower = str(exe_path).lower()
         args_lower = uninstall_str.lower()
 
@@ -514,53 +518,55 @@ class AppManager:
             cmd, timeout=settings.app_manager.uninstall_timeout_s
         )
         if code == 0:
-            return self._ok(f"'{app_name}' удалён через реестр.", method="registry")
+            return self._ok(
+                f"'{app_name}' uninstalled via registry.", method="registry"
+            )
         return self._err(
-            f"Ошибка удаления '{app_name}': {err or out}",
+            f"Error uninstalling '{app_name}': {err or out}",
             method="registry",
             returncode=code,
         )
 
     # ------------------------------------------------------------------
-    # Публичный API
+    # Public API
     # ------------------------------------------------------------------
 
     def launch_app(self, app_name: str) -> OperationResult:
         """
-        Запустить приложение по имени, алиасу или полному пути.
+        Launch an application by name, alias, or full path.
 
-        Поддерживает:
-          - Русские алиасы ("дискорд", "блокнот")
-          - URI-протоколы ("ms-settings:", "com.epicgames.launcher://")
-          - Консольные приложения (cmd, powershell) с видимым окном
+        Supports:
+          - Localized aliases ("discord", "notepad")
+          - URI protocols ("ms-settings:", "com.epicgames.launcher://")
+          - Console apps (cmd, powershell) with visible window
 
         Args:
-            app_name: Имя, алиас или путь (напр. "discord", "блокнот", "settings").
+            app_name: Name, alias, or path (e.g. "discord", "notepad", "settings").
 
         Returns:
-            OperationResult с полями data["resolved"] и data["pid"].
+            OperationResult with fields data["resolved"] and data["pid"].
         """
         resolved = self._resolve_app_name(app_name)
 
-        # URI-протокол (ms-settings:, com.epicgames.launcher://, …) — только startfile
+        # URI protocol (ms-settings:, com.epicgames.launcher://, …) — only via startfile
         if "://" in resolved or resolved.endswith(":"):
             try:
                 os.startfile(resolved)
                 return self._ok(
-                    f"'{app_name}' запущен через системный обработчик.",
+                    f"'{app_name}' launched via system handler.",
                     app=app_name,
                     resolved=resolved,
                 )
             except OSError as exc:
                 return self._err(
-                    f"Не удалось открыть '{app_name}' через URI: {exc}",
+                    f"Failed to open '{app_name}' via URI: {exc}",
                     app=app_name,
                     resolved=resolved,
                 )
 
         exe_name = self._to_exe_name(resolved)
 
-        # Консольные приложения требуют CREATE_NEW_CONSOLE, иначе окно скрыто
+        # Console apps require CREATE_NEW_CONSOLE, otherwise window is hidden
         is_console = exe_name.lower() in APP_CONSOLE_APPS
         creation_flags = subprocess.CREATE_NEW_CONSOLE if is_console else 0
 
@@ -574,30 +580,30 @@ class AppManager:
             )
             time.sleep(
                 settings.app_manager.launch_wait_s
-            )  # GUI-процессу нужно время на инициализацию
+            )  # GUI process needs time to initialize
 
-            # Некоторые лаунчеры запускают дочерний процесс
-            # и сразу завершаются — для них proc.poll() == 0, но приложение живо.
-            # Считаем успехом если: процесс жив (poll=None) ИЛИ завершился чисто (poll=0).
+            # Some launchers spawn a child process and exit immediately
+            # so proc.poll() == 0 but the app is actually running.
+            # Consider success if: process is alive (poll=None) OR exited cleanly (poll=0).
             poll = proc.poll()
             if poll is not None and poll != 0:
                 return self._err(
-                    f"'{app_name}' завершился с ошибкой (код {poll}).",
+                    f"'{app_name}' exited with error (code {poll}).",
                     app=app_name,
                     resolved=resolved,
                     returncode=poll,
                 )
 
-            # Для не-лаунчеров дополнительно проверяем tasklist
+            # For non-launchers additionally check tasklist
             if poll is None and not self._is_process_running(exe_name):
                 return self._err(
-                    f"'{app_name}' не обнаружен в процессах после запуска.",
+                    f"'{app_name}' not found in process list after launch.",
                     app=app_name,
                     resolved=resolved,
                 )
 
             return self._ok(
-                f"Приложение '{app_name}' запущено.",
+                f"Application '{app_name}' launched.",
                 app=app_name,
                 resolved=resolved,
                 pid=proc.pid,
@@ -605,26 +611,26 @@ class AppManager:
 
         except FileNotFoundError:
             return self._err(
-                f"Файл '{resolved}' не найден. Проверьте имя приложения.",
+                f"File '{resolved}' not found. Check application name.",
                 app=app_name,
                 resolved=resolved,
             )
         except PermissionError:
-            # WinError 5 — требуется UAC-повышение
+            # WinError 5 — requires UAC elevation
             return self._launch_elevated(app_name, resolved)
         except OSError as exc:
             if getattr(exc, "winerror", None) == 5:
                 return self._launch_elevated(app_name, resolved)
-            return self._err(f"Не удалось запустить '{app_name}': {exc}")
+            return self._err(f"Failed to launch '{app_name}': {exc}")
 
     def _launch_elevated(self, app_name: str, resolved: str) -> OperationResult:
         """
-        Запуск с UAC-повышением через ShellExecuteW (runas).
-        Используется как fallback при WinError 5 (Access denied).
+        Launch with UAC elevation via ShellExecuteW (runas).
+        Used as fallback on WinError 5 (Access denied).
         """
         import ctypes
 
-        logger.info("Запрос UAC-повышения для '%s'...", app_name)
+        logger.info("Requesting UAC elevation for '%s'...", app_name)
         try:
             ret = ctypes.windll.shell32.ShellExecuteW(
                 None,
@@ -634,55 +640,55 @@ class AppManager:
                 None,
                 1,  # SW_SHOWNORMAL
             )
-            if ret > 32:  # ShellExecute возвращает > 32 при успехе
+            if ret > 32:  # ShellExecute returns > 32 on success
                 return self._ok(
-                    f"'{app_name}' запущен с повышенными правами.",
+                    f"'{app_name}' launched with elevated privileges.",
                     app=app_name,
                     resolved=resolved,
                     elevated=True,
                 )
             return self._err(
-                f"Не удалось запустить '{app_name}' с повышением (код {ret}).",
+                f"Failed to launch '{app_name}' with elevation (code {ret}).",
                 app=app_name,
                 resolved=resolved,
             )
         except Exception as exc:
-            return self._err(f"Ошибка UAC-запуска '{app_name}': {exc}")
+            return self._err(f"UAC launch error for '{app_name}': {exc}")
 
     def close_app(self, app_name: str) -> OperationResult:
         """
-        Завершить процесс по имени (без расширения .exe).
+        Terminate a process by name (without .exe extension).
 
         Args:
-            app_name: Имя процесса (напр. "notepad", "discord").
+            app_name: Process name (e.g. "notepad", "discord").
         """
         code, out, err = self._run(["taskkill", "/IM", f"{app_name}.exe", "/F"])
         if code == 0:
-            return self._ok(f"Процесс '{app_name}' завершён.", output=out)
+            return self._ok(f"Process '{app_name}' terminated.", output=out)
         return self._err(
-            f"Не удалось завершить '{app_name}': {err or out}", returncode=code
+            f"Failed to terminate '{app_name}': {err or out}", returncode=code
         )
 
     def uninstall_app(self, app_name: str) -> OperationResult:
         """
-        Удалить установленное приложение.
+        Uninstall an installed application.
 
-        Стратегия:
-          1. winget uninstall  — тихое удаление без UI
-          2. реестр (fallback) — UninstallString для legacy и Steam-игр
+        Strategy:
+          1. winget uninstall  — silent uninstall without UI
+          2. registry (fallback) — UninstallString for legacy and Steam apps
 
         Args:
-            app_name: Название приложения (напр. "Telegram").
+            app_name: Application name (e.g. "Telegram").
 
         Returns:
-            OperationResult с полем data["method"] — использованный способ.
+            OperationResult with data["method"] — method used.
         """
         result = self._uninstall_via_winget(app_name)
         if result.status == OperationStatus.SUCCESS:
             self.refresh_registry_cache()
             return result
 
-        logger.warning("winget не справился, пробуем реестр...")
+        logger.warning("winget failed, trying registry...")
         result = self._uninstall_via_registry(app_name)
         if result.status == OperationStatus.SUCCESS:
             self.refresh_registry_cache()
@@ -690,36 +696,36 @@ class AppManager:
 
     def list_running_apps(self) -> OperationResult:
         """
-        Список запущенных процессов.
+        List of running processes.
 
         Returns:
-            OperationResult с полем data["processes"] — отсортированный список имён.
+            OperationResult with data["processes"] — sorted list of names.
         """
         code, out, err = self._run(["tasklist", "/FO", "CSV", "/NH"])
         if code != 0:
-            return self._err(f"Не удалось получить список процессов: {err}")
+            return self._err(f"Failed to get process list: {err}")
         processes = sorted(
             {line.split(",")[0].strip('"') for line in out.splitlines() if line.strip()}
         )
-        return self._ok(f"Запущено процессов: {len(processes)}.", processes=processes)
+        return self._ok(f"Running processes: {len(processes)}.", processes=processes)
 
     def is_app_running(self, app_name: str) -> OperationResult:
         """
-        Проверить, запущено ли приложение.
+        Check if an application is running.
 
-        Принимает алиас, русское название или имя .exe.
+        Accepts alias, localized name, or .exe name.
 
         Args:
-            app_name: Алиас или имя процесса (напр. "discord", "дискорд").
+            app_name: Alias or process name (e.g. "discord").
 
         Returns:
-            OperationResult с полем data["running"] — bool.
+            OperationResult with data["running"] — bool.
         """
         resolved = self._resolve_app_name(app_name)
         exe_name = self._to_exe_name(resolved)
         running = self._is_process_running(exe_name)
         return self._ok(
-            f"'{app_name}' {'запущен' if running else 'не запущен'}.",
+            f"'{app_name}' {'is running' if running else 'is not running'}.",
             running=running,
             app=app_name,
             resolved=exe_name,
@@ -727,7 +733,7 @@ class AppManager:
 
 
 # ---------------------------------------------------------------------------
-# Быстрое тестирование
+# Quick testing
 # ---------------------------------------------------------------------------
 
 # am = AppManager()
