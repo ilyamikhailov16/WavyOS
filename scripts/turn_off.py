@@ -2,6 +2,9 @@ import os
 import sys
 import time
 import platform
+from app_logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def shutdown():
@@ -12,7 +15,7 @@ def shutdown():
     elif sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
         os.system("shutdown now")
     else:
-        print("Unsupported operating system")
+        logger.error("Unsupported operating system: %s", sys.platform)
 
 
 def shutdown_with_timer(minutes):
@@ -35,10 +38,10 @@ def shutdown_with_timer(minutes):
         elif system == "Linux":
             os.system("sudo shutdown now")
         else:
-            print("Unsupported operating system")
+            logger.error("Unsupported operating system: %s", sys.platform)
             return
     except KeyboardInterrupt:
-        print("Shutdown cancelled by user")
+        logger.info("Shutdown cancelled by user")
         if system == "Windows":
             os.system("shutdown /a")
         sys.exit(0)
