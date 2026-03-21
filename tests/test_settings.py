@@ -20,7 +20,6 @@ def test_browser_paths_are_available_for_custom_browsers() -> None:
 
 def test_other_script_settings_are_available() -> None:
     assert settings.screen_tool.hotkeys.toggle_recording == "F9"
-    assert settings.script_runner.dummy.script_name.endswith(".py")
     assert settings.energy_saver.power.enabled_refresh_rate_hz > 0
     assert settings.system_toggle.ui.airplane_mode_timeout_seconds > 0
     assert settings.trash_tool.paths.downloads_dir_name == "Downloads"

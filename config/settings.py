@@ -4,6 +4,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+ROOT_DIR = Path(__file__).resolve().parents[1]
+
 
 class TimeoutsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -183,25 +185,10 @@ class ScreenToolSettings(BaseModel):
     fps: float = 20.0
 
 
-class ScriptRunnerDummySettings(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    script_name: str = "play_sound.py"
-    script_directory: str = "C:/"
-
-
-class ScriptRunnerHotkeysSettings(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    run_dummy: str = "ctrl+shift+r"
-    exit: str = "esc"
-
-
 class ScriptRunnerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    dummy: ScriptRunnerDummySettings = ScriptRunnerDummySettings()
-    hotkeys: ScriptRunnerHotkeysSettings = ScriptRunnerHotkeysSettings()
+    default_script_path: Path = ROOT_DIR / "scripts"
 
 
 class EnergySaverPowerSettings(BaseModel):
@@ -356,8 +343,7 @@ class LoggingSettings(BaseModel):
 
 @lru_cache(maxsize=1)
 def _load_root_config() -> dict:
-    root_dir = Path(__file__).resolve().parents[1]
-    config_path = root_dir / "config.json"
+    config_path = ROOT_DIR / "config.json"
     if not config_path.exists():
         return {}
     try:
