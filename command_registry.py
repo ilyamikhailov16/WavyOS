@@ -1,5 +1,9 @@
 from scripts.trash_tool import empty_recycle_bin
-from scripts.screen_tool import take_screenshot
+from scripts.screen_tool import (
+    take_screenshot,
+    start_recording,
+    stop_recording
+)
 from scripts.turn_off import shutdown
 from scripts.system_toggle_tool import (
     toggle_wifi,
@@ -24,4 +28,6 @@ COMMAND_POOL = {
     "Переключить звук": toggle_mute,
     "Включить режим энергосбережения": enable_energy_saver_mode,
     "Выключить режим энергосбережения": disable_energy_saver_mode,
+    "Включить запись экрана": start_recording,
+    "Выключить запись экрана": stop_recording
 }
