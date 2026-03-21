@@ -116,16 +116,6 @@ class BrowserRegistrySettings(BaseModel):
 class BrowserRuntimeSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    browser_choices: tuple[str, ...] = (
-        "default",
-        "chromium",
-        "firefox",
-        "webkit",
-        "chrome",
-        "edge",
-        "opera",
-        "yandex",
-    )
     display_names: dict[str, str] = {
         "chromium": "Playwright Chromium",
         "firefox": "Playwright Firefox",

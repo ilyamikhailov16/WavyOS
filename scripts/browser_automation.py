@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import subprocess
 from pathlib import Path
@@ -25,88 +24,28 @@ DEFAULT_WAIT_AFTER_MS = BROWSER_SETTINGS.timeouts.default_wait_after_ms
 logger = get_logger(__name__)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Open a website in a browser and perform a query with Playwright.",
-    )
-    parser.add_argument(
-        "--engine",
-        choices=PRESETS.names(),
-        help="Use a built-in preset for a known search engine.",
-    )
-    parser.add_argument(
-        "--url",
-        help="Target URL. If omitted, the URL from --engine is used.",
-    )
-    parser.add_argument(
-        "--query",
-        required=True,
-        help="Text to enter into the target field.",
-    )
-    parser.add_argument(
-        "--input-selector",
-        help="CSS selector for the input field. Overrides preset selector.",
-    )
-    parser.add_argument(
-        "--submit-selector",
-        help="Optional CSS selector for a submit button. If omitted, Enter is pressed.",
-    )
-    parser.add_argument(
-        "--browser",
-        choices=BROWSER_SETTINGS.runtime.browser_choices,
-        default="default",
-        help="Browser to launch. 'default' resolves the Windows default browser.",
-    )
-    parser.add_argument(
-        "--headed",
-        action="store_true",
-        help="Show the browser window instead of running headless.",
-    )
-    parser.add_argument(
-        "--timeout-ms",
-        type=int,
-        default=DEFAULT_TIMEOUT_MS,
-        help="Timeout for page actions in milliseconds.",
-    )
-    parser.add_argument(
-        "--wait-after-ms",
-        type=int,
-        default=DEFAULT_WAIT_AFTER_MS,
-        help="How long to wait after submitting the query.",
-    )
-    parser.add_argument(
-        "--screenshot",
-        help="Optional path to save a screenshot after submission.",
-    )
-    return parser
-
-
-def resolve_config(args: argparse.Namespace) -> tuple[str, str]:
-    preset = PRESETS.get(args.engine)
-    url = args.url or (preset.url if preset else None)
-    input_selector = args.input_selector or (preset.input_selector if preset else None)
-
-    if not url:
-        raise ValueError("Specify --url or use --engine with a built-in URL preset.")
-    if not input_selector:
-        raise ValueError(
-            "Specify --input-selector or use --engine with a built-in selector preset."
-        )
-
+def resolve_config(website_name: str, input_selector: str | None = None) -> tuple[str, str | None]:
+    preset = PRESETS.get(website_name)
+    if preset:
+        url = preset.url
+        input_selector = input_selector or preset.input_selector
+    else:
+        url = website_name if website_name.startswith("http") else f"https://{website_name}"
+        
     return url, input_selector
 
 
-def build_direct_search_url(args: argparse.Namespace) -> str | None:
-    if not args.engine:
+def build_direct_search_url(website_name: str, query: str | None, input_selector: str | None, submit_selector: str | None) -> str | None:
+    if not query:
         return None
-    if args.input_selector or args.submit_selector:
+    if input_selector or submit_selector:
         return None
 
-    preset = PRESETS.get(args.engine)
+    preset = PRESETS.get(website_name)
     search_url = preset.search_url if preset else None
     if not search_url:
         return None
-    return search_url.format(query=quote_plus(args.query))
+    return search_url.format(query=quote_plus(query))
 
 
 def get_windows_default_browser_progid() -> str | None:
@@ -229,69 +168,69 @@ def open_url_in_existing_browser(browser_key: str, target_url: str) -> bool:
 
 
 def resolve_browser_launch_options(
-    args: argparse.Namespace,
+    browser: str, headed: bool
 ) -> tuple[str, dict[str, str | bool], str, str]:
-    if args.browser == "chromium":
+    if browser == "chromium":
         logger.info("Browser selection: explicit Playwright Chromium.")
         return (
             "chromium",
-            {"headless": not args.headed},
+            {"headless": not headed},
             BROWSER_SETTINGS.runtime.display_name_for("chromium"),
             "chromium",
         )
-    if args.browser == "firefox":
+    if browser == "firefox":
         logger.info("Browser selection: explicit Playwright Firefox.")
         return (
             "firefox",
-            {"headless": not args.headed},
+            {"headless": not headed},
             BROWSER_SETTINGS.runtime.display_name_for("firefox"),
             "firefox",
         )
-    if args.browser == "webkit":
+    if browser == "webkit":
         logger.info("Browser selection: explicit Playwright WebKit.")
         return (
             "webkit",
-            {"headless": not args.headed},
+            {"headless": not headed},
             BROWSER_SETTINGS.runtime.display_name_for("webkit"),
             "webkit",
         )
-    if args.browser == "chrome":
+    if browser == "chrome":
         logger.info("Browser selection: explicit Google Chrome channel.")
         return (
             "chromium",
             {
-                "headless": not args.headed,
+                "headless": not headed,
                 "channel": BROWSER_SETTINGS.runtime.playwright_channel_for("chrome"),
             },
             BROWSER_SETTINGS.runtime.display_name_for("chrome"),
             "chrome",
         )
-    if args.browser == "edge":
+    if browser == "edge":
         logger.info("Browser selection: explicit Microsoft Edge channel.")
         return (
             "chromium",
             {
-                "headless": not args.headed,
+                "headless": not headed,
                 "channel": BROWSER_SETTINGS.runtime.playwright_channel_for("edge"),
             },
             BROWSER_SETTINGS.runtime.display_name_for("edge"),
             "edge",
         )
-    if args.browser in {"opera", "yandex"}:
-        executable_path = find_custom_browser_executable(args.browser)
-        readable_name = BROWSER_SETTINGS.runtime.display_name_for(args.browser)
+    if browser in {"opera", "yandex"}:
+        executable_path = find_custom_browser_executable(browser)
+        readable_name = BROWSER_SETTINGS.runtime.display_name_for(browser)
         if executable_path:
             logger.info("Browser selection: explicit %s executable.", readable_name)
             logger.info("Playwright will launch via executable: %s", executable_path)
             return (
                 "chromium",
-                {"headless": not args.headed, "executable_path": str(executable_path)},
+                {"headless": not headed, "executable_path": str(executable_path)},
                 readable_name,
-                args.browser,
+                browser,
             )
         logger.warning("%s executable was not found in the standard Windows paths.", readable_name)
         logger.warning("Fallback selected: Playwright Chromium will be used.")
-        return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+        return "chromium", {"headless": not headed}, "Playwright Chromium", "chromium"
 
     progid = get_windows_default_browser_progid()
     if progid:
@@ -301,8 +240,7 @@ def resolve_browser_launch_options(
             logger.info("Windows default browser detected: %s (%s)", readable_name, progid)
 
             if browser_key in {"edge", "chrome", "firefox"}:
-                mapped_args = argparse.Namespace(browser=browser_key, headed=args.headed)
-                return resolve_browser_launch_options(mapped_args)
+                return resolve_browser_launch_options(browser=browser_key, headed=headed)
 
             executable_path = find_custom_browser_executable(browser_key)
             if executable_path:
@@ -313,7 +251,7 @@ def resolve_browser_launch_options(
                 logger.info("Executable path: %s", executable_path)
                 return (
                     "chromium",
-                    {"headless": not args.headed, "executable_path": str(executable_path)},
+                    {"headless": not headed, "executable_path": str(executable_path)},
                     readable_name,
                     browser_key,
                 )
@@ -322,7 +260,7 @@ def resolve_browser_launch_options(
             logger.warning(
                 "Fallback selected: Playwright Chromium will be used instead of the system default browser."
             )
-            return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+            return "chromium", {"headless": not headed}, "Playwright Chromium", "chromium"
 
         logger.warning(
             "Windows default browser '%s' is not mapped yet.", progid
@@ -338,103 +276,117 @@ def resolve_browser_launch_options(
             "Fallback selected: Playwright Chromium will be used."
         )
 
-    return "chromium", {"headless": not args.headed}, "Playwright Chromium", "chromium"
+    return "chromium", {"headless": not headed}, "Playwright Chromium", "chromium"
 
 
-async def run_browser_task(args: argparse.Namespace) -> None:
-    url, input_selector = resolve_config(args)
-    browser_name, launch_kwargs, browser_label, browser_key = resolve_browser_launch_options(args)
-    direct_search_url = build_direct_search_url(args)
-
-    if args.headed and PROCESS_NAMES.for_browser(browser_key):
-        existing_tab_url = direct_search_url or url
-        if direct_search_url or (args.url and not args.input_selector and not args.submit_selector):
-            if open_url_in_existing_browser(browser_key, existing_tab_url):
-                logger.info("Opened a new tab in the existing %s window.", browser_label)
-                if direct_search_url:
-                    logger.info("The query was sent through the URL directly.")
-                else:
-                    logger.info("Opened the requested URL in a new tab without launching a new window.")
-                return
-
-            logger.info(
-                "No reusable %s window was found, so a Playwright-managed window will be launched.",
-                browser_label,
-            )
-        else:
-            logger.info(
-                "Existing-browser tab reuse is skipped because this scenario still needs page interaction."
-            )
-
-    async with async_playwright() as playwright:
-        browser_type = getattr(playwright, browser_name)
-
-        logger.info(
-            "Launching browser via Playwright: %s (engine=%s)",
-            browser_label,
-            browser_name,
-        )
-        browser = await browser_type.launch(**launch_kwargs)
-
-        try:
-            page = await browser.new_page()
-            page.set_default_timeout(args.timeout_ms)
-
-            logger.info("Opening %s", url)
-            await page.goto(url, wait_until="domcontentloaded")
-
-            logger.info("Waiting for input: %s", input_selector)
-            field = page.locator(input_selector).first
-            await field.wait_for(state="visible")
-            await field.click()
-            await field.fill(args.query)
-
-            if args.submit_selector:
-                logger.info("Submitting via button: %s", args.submit_selector)
-                submit_button = page.locator(args.submit_selector).first
-                await submit_button.wait_for(state="visible")
-                await submit_button.click()
-            else:
-                logger.info("Submitting via Enter")
-                await field.press("Enter")
-
-            if args.wait_after_ms > 0:
-                await page.wait_for_timeout(args.wait_after_ms)
-
-            if args.screenshot:
-                screenshot_path = Path(args.screenshot)
-                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
-                await page.screenshot(path=str(screenshot_path), full_page=True)
-                logger.info("Screenshot saved to %s", screenshot_path)
-        except PlaywrightTimeoutError as exc:
-            raise RuntimeError(
-                "Timed out while interacting with the page. Check the selectors or increase --timeout-ms."
-            ) from exc
-        finally:
-            await browser.close()
-
-
-def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-
+async def open_in_browser(
+    website_name: str,
+    query: str | None = None,
+    input_selector: str | None = None,
+    submit_selector: str | None = None,
+    browser: str = "default",
+    headed: bool = True,
+    timeout_ms: int = DEFAULT_TIMEOUT_MS,
+    wait_after_ms: int = DEFAULT_WAIT_AFTER_MS,
+    screenshot: str | None = None,
+) -> None:
+    """
+    Open a website in a browser and optionally perform a query using Playwright.
+    
+    :param website_name: Domain name or preset engine name (e.g., 'google', 'example.com')
+    :param query: Optional text to enter into the target field.
+    :param input_selector: Optional CSS selector for the input field. Overrides preset selector.
+    :param submit_selector: Optional CSS selector for a submit button. If omitted, Enter is pressed.
+    :param browser: Browser to launch. 'default' resolves the Windows default browser.
+    :param headed: Whether to show the browser window (False for headless).
+    :param timeout_ms: Timeout for page actions in milliseconds.
+    :param wait_after_ms: How long to wait after submitting or loading.
+    :param screenshot: Optional path to save a screenshot after completion.
+    """
     try:
-        asyncio.run(run_browser_task(args))
-    except ValueError as exc:
-        parser.error(str(exc))
+        url, resolved_input_selector = resolve_config(website_name, input_selector)
+        browser_name, launch_kwargs, browser_label, browser_key = resolve_browser_launch_options(browser, headed)
+        direct_search_url = build_direct_search_url(website_name, query, input_selector, submit_selector)
+
+        if headed and PROCESS_NAMES.for_browser(browser_key):
+            target_url = direct_search_url or url
+            if direct_search_url or not query:
+                if open_url_in_existing_browser(browser_key, target_url):
+                    logger.info("Opened a new tab in the existing %s window.", browser_label)
+                    if direct_search_url:
+                        logger.info("The query was sent through the URL directly.")
+                    else:
+                        logger.info("Opened the requested URL in a new tab without launching a new window.")
+                    return
+
+                logger.info(
+                    "No reusable %s window was found, so a Playwright-managed window will be launched.",
+                    browser_label,
+                )
+            else:
+                logger.info(
+                    "Existing-browser tab reuse is skipped because this scenario still needs page interaction."
+                )
+
+        async with async_playwright() as playwright:
+            browser_type = getattr(playwright, browser_name)
+
+            logger.info(
+                "Launching browser via Playwright: %s (engine=%s)",
+                browser_label,
+                browser_name,
+            )
+            pw_browser = await browser_type.launch(**launch_kwargs)
+
+            try:
+                page = await pw_browser.new_page()
+                page.set_default_timeout(timeout_ms)
+
+                target_url = direct_search_url or url
+                logger.info("Opening %s", target_url)
+                await page.goto(target_url, wait_until="domcontentloaded")
+
+                if query and not direct_search_url:
+                    if resolved_input_selector:
+                        logger.info("Waiting for input: %s", resolved_input_selector)
+                        field = page.locator(resolved_input_selector).first
+                        await field.wait_for(state="visible")
+                        await field.click()
+                        await field.fill(query)
+
+                        if submit_selector:
+                            logger.info("Submitting via button: %s", submit_selector)
+                            submit_button = page.locator(submit_selector).first
+                            await submit_button.wait_for(state="visible")
+                            await submit_button.click()
+                        else:
+                            logger.info("Submitting via Enter")
+                            await field.press("Enter")
+                    else:
+                        logger.warning("Query provided but no input selector resolved. Skipping query input.")
+
+                if wait_after_ms > 0:
+                    await page.wait_for_timeout(wait_after_ms)
+
+                if screenshot:
+                    screenshot_path = Path(screenshot)
+                    screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                    await page.screenshot(path=str(screenshot_path), full_page=True)
+                    logger.info("Screenshot saved to %s", screenshot_path)
+                    
+            except PlaywrightTimeoutError as exc:
+                raise RuntimeError(
+                    "Timed out while interacting with the page. Check the selectors or increase timeout_ms."
+                ) from exc
+            finally:
+                await pw_browser.close()
+                
     except RuntimeError as exc:
         logger.error("%s", exc)
-        return 1
+        raise
     except Exception as exc:
         logger.error("Browser automation failed: %s", exc)
         logger.info("If Playwright is not installed yet, run: pip install -r requirements.txt")
         logger.info("Then install a browser once: playwright install chromium")
-        logger.info("If you use Firefox with --browser default, you may also need: playwright install firefox")
-        return 1
-
-    logger.info("Browser automation finished successfully.")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+        logger.info("If you use Firefox with browser='default', you may also need: playwright install firefox")
+        raise
