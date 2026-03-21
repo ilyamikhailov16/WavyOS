@@ -96,4 +96,12 @@ class App:
 
 if __name__ == "__main__":
     app = App(settings, COMMAND_POOL)
-    app.start()
+
+    try:
+        app.start()
+        while True:
+            pass  # keep main thread alive
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
+    finally:
+        app.stop()
