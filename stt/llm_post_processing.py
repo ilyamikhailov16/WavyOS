@@ -1,10 +1,13 @@
 """LLM text processing, ignoring unnecessary or receiving commands functionality."""
 
 from openai import OpenAI
+from commands_schema import Command
 
 
 class LLMProcessor:
-    def __init__(self, base_url: str, api_key: str, model_path: str, system_prompt: str) -> None:
+    def __init__(
+        self, base_url: str, api_key: str, model_path: str, system_prompt: str
+    ) -> None:
         """Object initialization. The model and system prompt are fixed"""
 
         self.client = OpenAI(
@@ -27,8 +30,17 @@ class LLMProcessor:
                 {
                     "role": "user",
                     "content": user_prompt,
-                }
+                },
             ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "Command",
+                    "strict": True,
+                    "schema": Command.model_json_schema(),
+                },
+            },
+            temperature=0,
         )
         return response.choices[0].message.content
 

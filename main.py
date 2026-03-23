@@ -1,6 +1,9 @@
 import logging
 import queue as q
 import threading as th
+import json
+import asyncio
+import inspect
 from typing import Any, Callable, Optional
 
 from stt import LLMProcessor, run_voice_processing
@@ -46,19 +49,32 @@ class App:
 
     def _run_loop(self, stop_event: th.Event, queue: q.Queue[str]) -> None:
         """Consume recognized commands from a queue and execute matching handlers."""
-
         while not stop_event.is_set():
             try:
-                command = queue.get(timeout=0.5)
+                command_str = queue.get(timeout=0.5)
             except q.Empty:
                 continue
 
-            logger.info("Recognised: %s", command)
+            logger.info("Recognised command_str: %s", command_str)
+
+            cmd_json = json.loads(command_str)
+            cmd_data = cmd_json["command"]
+            command = cmd_data.get("command_name")
+            kwargs = cmd_data.get("kwargs", {})
+
+            logger.info("Recognised command: %s", command)
+            logger.info("Recognised kwargs: %s", kwargs)
+
+            if command == "#":
+                continue
 
             command_fn = self.command_pool.get(command)
             if command_fn:
                 try:
-                    command_fn()
+                    if inspect.iscoroutinefunction(command_fn):
+                        asyncio.run(command_fn(**kwargs))
+                    else:
+                        command_fn(**kwargs)
                     logger.info("Work is done")
                 except Exception:
                     logger.exception("Exception caught while executing command")
