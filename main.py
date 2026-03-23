@@ -1,3 +1,4 @@
+import time
 import logging
 import queue as q
 import threading as th
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     try:
         app.start()
         while True:
-            pass  # keep main thread alive
+            time.sleep(1)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     finally:
