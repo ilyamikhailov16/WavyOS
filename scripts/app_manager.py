@@ -536,7 +536,7 @@ class AppManager:
         Launch an application by name, alias, or full path.
 
         Supports:
-          - Localized aliases ("discord", "notepad")
+          - Localized aliases ("дискорд", "блокнот")
           - URI protocols ("ms-settings:", "com.epicgames.launcher://")
           - Console apps (cmd, powershell) with visible window
 
@@ -657,16 +657,18 @@ class AppManager:
 
     def close_app(self, app_name: str) -> OperationResult:
         """
-        Terminate a process by name (without .exe extension).
+        Terminate a process by name or alias (without .exe extension).
 
         Args:
             app_name: Process name (e.g. "notepad", "discord").
         """
-        code, out, err = self._run(["taskkill", "/IM", f"{app_name}.exe", "/F"])
+        resolved = self._resolve_app_name(app_name)
+
+        code, out, err = self._run(["taskkill", "/IM", f"{resolved}", "/F"])
         if code == 0:
-            return self._ok(f"Process '{app_name}' terminated.", output=out)
+            return self._ok(f"Process '{resolved}' terminated.", output=out)
         return self._err(
-            f"Failed to terminate '{app_name}': {err or out}", returncode=code
+            f"Failed to terminate '{resolved}': {err or out}", returncode=code
         )
 
     def uninstall_app(self, app_name: str) -> OperationResult:
@@ -742,5 +744,5 @@ class AppManager:
 # print(am.launch_app("riot client").to_json())
 # print(am.is_app_running("discord").to_json())
 
-# print(am.close_app("notepad").to_json())
+# print(am.close_app("блокнот").to_json())
 # print(am.uninstall_app("VLC media player").to_json())
