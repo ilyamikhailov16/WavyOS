@@ -7,6 +7,13 @@ from pydantic import BaseModel, ConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
+class LLMProcessorSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    max_retries: int = 2
+    retry_sleep: int = 1
+
+
 class TimeoutsSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -397,6 +404,7 @@ class STTSettings(BaseModel):
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    llm_processor: LLMProcessorSettings = LLMProcessorSettings()
     browser: BrowserSettings = BrowserSettings()
     screen_tool: ScreenToolSettings = ScreenToolSettings()
     script_runner: ScriptRunnerSettings = ScriptRunnerSettings()

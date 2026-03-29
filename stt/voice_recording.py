@@ -5,6 +5,7 @@ import queue as q
 import threading as th
 from typing import Callable, Optional
 from RealtimeSTT import AudioToTextRecorder
+from commands_schema import Command
 
 from app_logging import get_logger
 
@@ -13,12 +14,12 @@ logger: logging.Logger = get_logger(__name__)
 
 def run_audio_recorder(
     stop_event: th.Event,
-    queue: Optional[q.Queue[str]],
+    queue: Optional[q.Queue[Command]],
     process_text_func: Optional[Callable[[str], Optional[str]]],
     **kwargs,
 ) -> None:
     """
-    Starts AudioToTextRecorder to recognize speech and convert it to text.
+    Starts AudioToTextRecorder to recognize speech and convert it to command.
     Activated by voice and stops recording after a certain length of silence at the end of a speech.
     Designed to work in a separate thread, so it waits for a stop_event.
     """
@@ -29,14 +30,14 @@ def run_audio_recorder(
                 return
 
             if process_text_func is not None:
-                text = process_text_func(text)
-                if text is None:
+                command = process_text_func(text)
+                if command is None:
                     logger.info(
                         "The message was not processed by the processor and was ignored"
                     )
                     return
 
-            queue.put(text)
+            queue.put(command)
         except Exception:
             logger.exception("Exception in STT callback")
 

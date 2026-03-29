@@ -2,12 +2,12 @@ import time
 import logging
 import queue as q
 import threading as th
-import json
 import asyncio
 import inspect
 from typing import Any, Callable, Optional
 
 from stt import LLMProcessor, run_voice_processing
+from commands_schema import Command, CommandEmptyArgs
 from config import settings
 
 from prompts import build_system_prompt
@@ -31,7 +31,7 @@ class App:
 
         self.cfg: Any = cfg
         self.command_pool: dict = command_pool
-        self.queue: q.Queue[str] = q.Queue()
+        self.queue: q.Queue[Command] = q.Queue()
         self.text_processor: Callable[[str], str | None] = self._build_text_processor()
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
@@ -52,24 +52,24 @@ class App:
         """Consume recognized commands from a queue and execute matching handlers."""
         while not stop_event.is_set():
             try:
-                command_str = queue.get(timeout=0.5)
+                command = queue.get(timeout=0.5)
             except q.Empty:
                 continue
 
-            logger.info("Recognised command_str: %s", command_str)
+            cmd_data = command.command
+            logger.info("Recognised command: %s", cmd_data)
 
-            cmd_json = json.loads(command_str)
-            cmd_data = cmd_json["command"]
-            command = cmd_data.get("command_name")
-            kwargs = cmd_data.get("kwargs", {})
+            cmd_name = cmd_data.command_name
+            kwargs = (
+                cmd_data.kwargs
+                if cmd_data.kwargs and not isinstance(cmd_data.kwargs, CommandEmptyArgs)
+                else {}
+            )
 
-            logger.info("Recognised command: %s", command)
-            logger.info("Recognised kwargs: %s", kwargs)
-
-            if command == "#":
+            if cmd_name == "#":
                 continue
 
-            command_fn = self.command_pool.get(command)
+            command_fn = self.command_pool.get(cmd_name)
             if command_fn:
                 try:
                     if inspect.iscoroutinefunction(command_fn):
