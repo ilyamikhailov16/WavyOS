@@ -1,0 +1,14 @@
+{
+    "stt": {
+        "model": "medium",
+        "language": "ru",
+        "compute_type": "float32",
+        "device": "cuda"
+    },
+    "use_llm_for_stt": true,
+    "api": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "token": "",
+        "model": "openai/gpt-oss-20b"
+    }
+}
