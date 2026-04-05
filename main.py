@@ -61,9 +61,9 @@ class App:
 
             cmd_name = cmd_data.command_name
             kwargs = (
-                cmd_data.kwargs
-                if cmd_data.kwargs and not isinstance(cmd_data.kwargs, CommandEmptyArgs)
-                else {}
+                {}
+                if isinstance(cmd_data.kwargs, CommandEmptyArgs)
+                else cmd_data.kwargs.model_dump()
             )
 
             if cmd_name == "#":
