@@ -1,3 +1,4 @@
+from command_keys import *
 from scripts.trash_tool import empty_recycle_bin
 from scripts.screen_tool import take_screenshot, start_recording, stop_recording
 from scripts.turn_off import shutdown
@@ -21,25 +22,25 @@ app_manager = AppManager()
 desktop_manager = DesktopManager()
 
 COMMAND_POOL = {
-    "Очистить корзину": empty_recycle_bin,
-    "Скриншот": take_screenshot,
-    "Выключить компьютер": shutdown,
-    "Переключить интернет": toggle_wifi,
-    "Переключить уведомления": toggle_notifications,
-    "Переключить режим полёта": toggle_airplane_mode,
-    "Переключить блютуз": toggle_bluetooth,
-    "Переключить звук": toggle_mute,
-    "Включить режим энергосбережения": enable_energy_saver_mode,
-    "Выключить режим энергосбережения": disable_energy_saver_mode,
-    "Включить запись экрана": start_recording,
-    "Выключить запись экрана": stop_recording,
-    "Открыть приложение": app_manager.launch_app,
-    "Закрыть приложение": app_manager.close_app,
-    "Удалить приложение": app_manager.uninstall_app,
-    "Создать файл": desktop_manager.create_file,
-    "Создать папку": desktop_manager.create_folder,
-    "Удалить": desktop_manager.delete,
-    "Переименовать": desktop_manager.rename,
-    "Запустить скрипт": run_script,
-    "Открыть сайт": open_in_browser,
+    CMD_EMPTY_RECYCLE_BIN: empty_recycle_bin,
+    CMD_SCREENSHOT: take_screenshot,
+    CMD_SHUTDOWN: shutdown,
+    CMD_WIFI: toggle_wifi,
+    CMD_NOTIFICATIONS: toggle_notifications,
+    CMD_AIRPLANE: toggle_airplane_mode,
+    CMD_BLUETOOTH: toggle_bluetooth,
+    CMD_SOUND: toggle_mute,
+    CMD_ENERGY_SAVER_ON: enable_energy_saver_mode,
+    CMD_ENERGY_SAVER_OFF: disable_energy_saver_mode,
+    CMD_RECORD_ON: start_recording,
+    CMD_RECORD_OFF: stop_recording,
+    CMD_LAUNCH_APP: app_manager.launch_app,
+    CMD_CLOSE_APP: app_manager.close_app,
+    CMD_UNINSTALL_APP: app_manager.uninstall_app,
+    CMD_CREATE_FILE: desktop_manager.create_file,
+    CMD_CREATE_FOLDER: desktop_manager.create_folder,
+    CMD_DELETE: desktop_manager.delete,
+    CMD_RENAME: desktop_manager.rename,
+    CMD_RUN_SCRIPT: run_script,
+    CMD_OPEN_SITE: open_in_browser,
 }

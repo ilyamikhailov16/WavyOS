@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Annotated, Literal, Union
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from command_keys import *
 
 
 class StrictBaseModel(BaseModel):
@@ -20,7 +21,7 @@ class CommandCreateFile(StrictBaseModel):
     folder: str | None = Field(
         default=None, description="Subfolder name on the desktop"
     )
-    data: str = Field(default="", description="Text content of the file")
+    content: str = Field(default="", description="Text content of the file")
 
 
 class CommandCreateFolder(StrictBaseModel):
@@ -52,107 +53,107 @@ class CommandOpenBrowser(StrictBaseModel):
 
 
 class CmdEmptyRecycleBin(StrictBaseModel):
-    command_name: Literal["Очистить корзину"]
+    command_name: Literal[CMD_EMPTY_RECYCLE_BIN]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdScreenshot(StrictBaseModel):
-    command_name: Literal["Скриншот"]
+    command_name: Literal[CMD_SCREENSHOT]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdShutdown(StrictBaseModel):
-    command_name: Literal["Выключить компьютер"]
+    command_name: Literal[CMD_SHUTDOWN]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdToggleWifi(StrictBaseModel):
-    command_name: Literal["Переключить интернет"]
+    command_name: Literal[CMD_WIFI]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdToggleNotifications(StrictBaseModel):
-    command_name: Literal["Переключить уведомления"]
+    command_name: Literal[CMD_NOTIFICATIONS]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdToggleAirplaneMode(StrictBaseModel):
-    command_name: Literal["Переключить режим полёта"]
+    command_name: Literal[CMD_AIRPLANE]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdToggleBluetooth(StrictBaseModel):
-    command_name: Literal["Переключить блютуз"]
+    command_name: Literal[CMD_BLUETOOTH]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdToggleMute(StrictBaseModel):
-    command_name: Literal["Переключить звук"]
+    command_name: Literal[CMD_SOUND]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdEnableEnergySaverMode(StrictBaseModel):
-    command_name: Literal["Включить режим энергосбережения"]
+    command_name: Literal[CMD_ENERGY_SAVER_ON]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdDisableEnergySaverMode(StrictBaseModel):
-    command_name: Literal["Выключить режим энергосбережения"]
+    command_name: Literal[CMD_ENERGY_SAVER_OFF]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdStartRecording(StrictBaseModel):
-    command_name: Literal["Включить запись экрана"]
+    command_name: Literal[CMD_RECORD_ON]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdStopRecording(StrictBaseModel):
-    command_name: Literal["Выключить запись экрана"]
+    command_name: Literal[CMD_RECORD_OFF]
     kwargs: CommandEmptyArgs = Field(default_factory=CommandEmptyArgs)
 
 
 class CmdLaunchApp(StrictBaseModel):
-    command_name: Literal["Открыть приложение"]
+    command_name: Literal[CMD_LAUNCH_APP]
     kwargs: CommandApp
 
 
 class CmdCloseApp(StrictBaseModel):
-    command_name: Literal["Закрыть приложение"]
+    command_name: Literal[CMD_CLOSE_APP]
     kwargs: CommandApp
 
 
 class CmdUninstallApp(StrictBaseModel):
-    command_name: Literal["Удалить приложение"]
+    command_name: Literal[CMD_UNINSTALL_APP]
     kwargs: CommandApp
 
 
 class CmdCreateFile(StrictBaseModel):
-    command_name: Literal["Создать файл"]
+    command_name: Literal[CMD_CREATE_FILE]
     kwargs: CommandCreateFile
 
 
 class CmdCreateFolder(StrictBaseModel):
-    command_name: Literal["Создать папку"]
+    command_name: Literal[CMD_CREATE_FOLDER]
     kwargs: CommandCreateFolder
 
 
 class CmdDelete(StrictBaseModel):
-    command_name: Literal["Удалить"]
+    command_name: Literal[CMD_DELETE]
     kwargs: CommandDelete
 
 
 class CmdRename(StrictBaseModel):
-    command_name: Literal["Переименовать"]
+    command_name: Literal[CMD_RENAME]
     kwargs: CommandRename
 
 
 class CmdRunScript(StrictBaseModel):
-    command_name: Literal["Запустить скрипт"]
+    command_name: Literal[CMD_RUN_SCRIPT]
     kwargs: CommandRunScript
 
 
 class CmdOpenBrowser(StrictBaseModel):
-    command_name: Literal["Открыть сайт"]
+    command_name: Literal[CMD_OPEN_SITE]
     kwargs: CommandOpenBrowser
 
 
