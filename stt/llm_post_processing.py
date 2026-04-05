@@ -3,7 +3,7 @@
 import time
 from openai import OpenAI, RateLimitError, BadRequestError, APIError
 from pydantic import ValidationError
-from commands_schema import Command
+from commands.commands_schema import Command
 
 from app_logging import get_logger
 from config import settings
@@ -54,7 +54,7 @@ class LLMProcessor:
                 )
 
                 return Command.model_validate_json(response.choices[0].message.content)
-            except (BadRequestError, APIError, RateLimitError, ValidationError) as e:
+            except (BadRequestError, APIError, RateLimitError) as e:
                 logger.error(f"API error (non-retryable): {e}")
                 return None
             except Exception as e:

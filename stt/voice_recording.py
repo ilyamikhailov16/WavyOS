@@ -5,7 +5,7 @@ import queue as q
 import threading as th
 from typing import Callable, Optional
 from RealtimeSTT import AudioToTextRecorder
-from commands_schema import Command
+from commands.commands_schema import Command
 
 from app_logging import get_logger
 

@@ -7,12 +7,12 @@ import inspect
 from typing import Any, Callable, Optional
 
 from stt import LLMProcessor, run_voice_processing
-from commands_schema import Command, CommandEmptyArgs
+from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
 
 from prompts import build_system_prompt
 from app_logging import get_logger
-from command_registry import COMMAND_POOL
+from commands.commands_registry import COMMAND_POOL
 
 logger: logging.Logger = get_logger(__name__)
 # logging.getLogger().setLevel(logging.ERROR)

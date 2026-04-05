@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 class LLMProcessorSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    max_retries: int = 2
+    max_retries: int = 3
     retry_sleep: int = 1
 
 

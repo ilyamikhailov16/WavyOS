@@ -1,4 +1,4 @@
-from command_keys import *
+from .commands_keys import *
 from scripts.trash_tool import empty_recycle_bin
 from scripts.screen_tool import take_screenshot, start_recording, stop_recording
 from scripts.turn_off import shutdown

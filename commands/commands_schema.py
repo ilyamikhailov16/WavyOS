@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field
-from command_keys import *
+from .commands_keys import *
 
 
 class StrictBaseModel(BaseModel):
