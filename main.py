@@ -6,11 +6,11 @@ import asyncio
 import inspect
 from typing import Any, Callable, Optional
 
-from stt import LLMProcessor, run_voice_processing
+from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
 
-from prompts import build_system_prompt
+from prompts import build_command_prompt, KWARGS_PROMPT 
 from app_logging import get_logger
 from commands.commands_registry import COMMAND_POOL
 
@@ -40,11 +40,19 @@ class App:
     def _build_text_processor(self) -> Callable[[str], str | None]:
         """Build a text post-processor that maps raw STT text to a command token."""
         if self.cfg.llm.use_for_stt:
-            return LLMProcessor(
-                base_url=self.cfg.llm.base_url,
-                api_key=self.cfg.llm.token,
-                model_path=self.cfg.llm.model,
-                system_prompt=build_system_prompt(self.command_pool),
+            return CommandProcessor(
+                command_name_processor = LLMProcessor(
+                    base_url=self.cfg.llm.base_url,
+                    api_key=self.cfg.llm.token,
+                    model_path=self.cfg.llm.model,
+                    system_prompt=build_command_prompt(self.command_pool),
+                ),
+                kwargs_processor = LLMProcessor(
+                    base_url=self.cfg.llm.base_url,
+                    api_key=self.cfg.llm.token,
+                    model_path=self.cfg.llm.model,
+                    system_prompt=KWARGS_PROMPT,
+                ),
             )
         return lambda text: text
 
