@@ -34,22 +34,52 @@ def toggle_mute() -> None:
 
 
 def toggle_wifi() -> None:
+    """
+    Переключает Wi-Fi через WinRT Radio API (аналогично toggle_bluetooth).
+    Меняет только состояние радио, адаптер остаётся активным → плитка не исчезает.
+    Требует прав администратора и разрешений на доступ к радио.
+    """
     ps_script = r"""
-$adapter = Get-NetAdapter | Where-Object { $_.PhysicalMediaType -eq 'Native 802.11' } | Select-Object -First 1
-if (-not $adapter) { Write-Output "NoWiFi"; exit 0 }
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
 
-$isOn = $adapter.Status -eq 'Up'
-$target = if ($isOn) { 'disable' } else { 'enable' }
+$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
+    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
+})[0]
 
-try {
-    netsh interface set interface name="$($adapter.Name)" admin=$target 2>$null
-    Start-Sleep -Milliseconds 3000
-    $verify = Get-NetAdapter -Name $adapter.Name -ErrorAction SilentlyContinue
-    $actualOn = $verify.Status -eq 'Up'
-    Write-Output $(if ($actualOn) { "On" } else { "Off" })
-} catch {
-    Write-Output $(if ($isOn) { "On" } else { "Off" })
+function Await($asyncTask, $resultType) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($resultType)
+    $netTask = $asTask.Invoke($null, @($asyncTask))
+    $netTask.Wait(-1) | Out-Null
+    return $netTask.Result
 }
+
+[Windows.Devices.Radios.Radio, Windows.System.Devices, ContentType=WindowsRuntime] | Out-Null
+
+$access = Await ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus])
+if ($access -ne 'Allowed') {
+    Write-Output "AccessDenied"
+    exit 0
+}
+
+$radios = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
+
+$wifi = $radios | Where-Object { $_.Kind -eq 'WiFi' } | Select-Object -First 1
+if (-not $wifi) {
+    Write-Output "NoWiFi"
+    exit 0
+}
+
+$current = $wifi.State
+$newState = if ($current -eq [Windows.Devices.Radios.RadioState]::On) {
+    [Windows.Devices.Radios.RadioState]::Off
+} else {
+    [Windows.Devices.Radios.RadioState]::On
+}
+
+$setResult = Await ($wifi.SetStateAsync($newState)) ([Windows.Devices.Radios.RadioAccessStatus])
+
+# 6. Выводим НОВОЕ состояние для логгера в Python
+Write-Output $(if ($newState -eq [Windows.Devices.Radios.RadioState]::On) { "On" } else { "Off" })
 """
     try:
         result = subprocess.run(
@@ -63,12 +93,10 @@ try {
         output = result.stdout.strip()
         if "NoWiFi" in output:
             logger.warning("Wi-Fi radio module was not found.")
+        elif "AccessDenied" in output:
+            logger.warning("Wi-Fi toggle requires additional Windows radio/location access.")
         else:
-            new_state = "on" if "On" in output else "off"
-            logger.info("Wi-Fi toggled. New state: %s", new_state)
-            # ℹ️ Информационное примечание о возможном поведении плитки на некоторых сборках Win 11
-            if new_state == "off":
-                logger.debug("Note: On some Windows 11 builds, the Wi-Fi tile may disappear from Quick Settings after programmatic toggle. To restore: Settings → Network & Internet → Wi-Fi → toggle On.")
+            logger.info("Wi-Fi toggled. New state: %s", "on" if "On" in output else "off")
     except subprocess.CalledProcessError as exc:
         logger.error("Wi-Fi PowerShell call failed (%s): %s", exc.returncode, exc.stderr.strip() or "no output")
     except Exception as exc:
