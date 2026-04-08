@@ -2,6 +2,7 @@
 
 import subprocess
 import time
+import ctypes
 
 import keyboard
 import pyautogui
@@ -14,6 +15,8 @@ from config import settings
 SYSTEM_TOGGLE_SETTINGS = settings.system_toggle
 logger = get_logger(__name__)
 
+import logging
+logger.setLevel(logging.DEBUG)
 
 def toggle_mute() -> None:
     pythoncom.CoInitialize()
@@ -32,32 +35,22 @@ def toggle_mute() -> None:
 
 def toggle_wifi() -> None:
     ps_script = r"""
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | ? { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
-Function Await($WinRtTask, $ResultType) {
-    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
-    $netTask = $asTask.Invoke($null, @($WinRtTask))
-    $netTask.Wait(-1) | Out-Null
-    $netTask.Result
-}
-[Windows.Devices.Radios.Radio,Windows.System.Devices,ContentType=WindowsRuntime] | Out-Null
-Await ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus]) | Out-Null
-$radios = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
-$wifi = $radios | ? { $_.Kind -eq 'WiFi' }
-if ($wifi) {
-    $current = $wifi.State
-    if ($current -eq [Windows.Devices.Radios.RadioState]::On) {
-        $newState = [Windows.Devices.Radios.RadioState]::Off
-    } else {
-        $newState = [Windows.Devices.Radios.RadioState]::On
-    }
-    Await ($wifi.SetStateAsync($newState)) ([Windows.Devices.Radios.RadioAccessStatus]) | Out-Null
-    Write-Output $newState
-} else {
-    Write-Output "NoWiFi"
+$adapter = Get-NetAdapter | Where-Object { $_.PhysicalMediaType -eq 'Native 802.11' } | Select-Object -First 1
+if (-not $adapter) { Write-Output "NoWiFi"; exit 0 }
+
+$isOn = $adapter.Status -eq 'Up'
+$target = if ($isOn) { 'disable' } else { 'enable' }
+
+try {
+    netsh interface set interface name="$($adapter.Name)" admin=$target 2>$null
+    Start-Sleep -Milliseconds 3000
+    $verify = Get-NetAdapter -Name $adapter.Name -ErrorAction SilentlyContinue
+    $actualOn = $verify.Status -eq 'Up'
+    Write-Output $(if ($actualOn) { "On" } else { "Off" })
+} catch {
+    Write-Output $(if ($isOn) { "On" } else { "Off" })
 }
 """
-
     try:
         result = subprocess.run(
             ["powershell", "-NoProfile", "-Command", ps_script],
@@ -71,12 +64,15 @@ if ($wifi) {
         if "NoWiFi" in output:
             logger.warning("Wi-Fi radio module was not found.")
         else:
-            logger.info("Wi-Fi toggled. New state: %s", "on" if "On" in output else "off")
+            new_state = "on" if "On" in output else "off"
+            logger.info("Wi-Fi toggled. New state: %s", new_state)
+            # ℹ️ Информационное примечание о возможном поведении плитки на некоторых сборках Win 11
+            if new_state == "off":
+                logger.debug("Note: On some Windows 11 builds, the Wi-Fi tile may disappear from Quick Settings after programmatic toggle. To restore: Settings → Network & Internet → Wi-Fi → toggle On.")
     except subprocess.CalledProcessError as exc:
         logger.error("Wi-Fi PowerShell call failed (%s): %s", exc.returncode, exc.stderr.strip() or "no output")
     except Exception as exc:
         logger.error("Could not toggle Wi-Fi: %s", exc)
-
 
 def toggle_bluetooth() -> None:
     ps_script = r"""
@@ -127,47 +123,60 @@ if ($bt) {
 
 def toggle_airplane_mode() -> None:
     ps_script = r"""
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$ErrorActionPreference = 'Stop'
 
-$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
-})[0]
-
-function Await($asyncTask, $resultType) {
-    $asTask = $asTaskGeneric.MakeGenericMethod($resultType)
-    $netTask = $asTask.Invoke($null, @($asyncTask))
-    $netTask.Wait(-1) | Out-Null
-    return $netTask.Result
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class NativeMethods {
+    [DllImport("ole32.dll")] public static extern int CoInitialize(IntPtr pv);
+    [DllImport("ole32.dll")] public static extern void CoUninitialize();
+    [DllImport("ole32.dll")] public static extern uint CoCreateInstance(Guid clsid, IntPtr pv, uint ctx, Guid iid, out IntPtr ppv);
 }
+[UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int GetSystemRadioStateDelegate(IntPtr cg, out int ie, out int se, out int p3);
+[UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int SetSystemRadioStateDelegate(IntPtr ptr, int state);
+[UnmanagedFunctionPointer(CallingConvention.StdCall)] public delegate int ReleaseDelegate(IntPtr ptr);
+'@
 
-[Windows.Devices.Radios.Radio, Windows.System.Devices, ContentType=WindowsRuntime] | Out-Null
-$access = Await ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus])
+$CLSID = '581333F6-28DB-41BE-BC7A-FF201F12F3F6'
+$IID   = 'DB3AFBFB-08E6-46C6-AA70-BF9A34C30AB7'
+$mrs   = [System.Runtime.InteropServices.Marshal]
+$comPtr = [IntPtr]::Zero
 
-if ($access -ne 'Allowed') {
+try {
+    $hr = [NativeMethods]::CoInitialize(0)
+    if ($hr -ne 0 -and $hr -ne 1) { throw "CoInitialize failed" }
+
+    $hr = [NativeMethods]::CoCreateInstance([Guid]::Parse($CLSID), [IntPtr]::Zero, 4, [Guid]::Parse($IID), [ref]$comPtr)
+    if ($hr -ne 0) { throw "CoCreateInstance failed: 0x$($hr.ToString('X8'))" }
+
+    $vtablePtr = $mrs::ReadIntPtr($comPtr)
+    $vtable = [IntPtr[]]::new(8)
+    $mrs::Copy($vtablePtr, $vtable, 0, $vtable.Length)
+
+    $release = $mrs::GetDelegateForFunctionPointer($vtable[2], [ReleaseDelegate])
+
+    $getState = $mrs::GetDelegateForFunctionPointer($vtable[5], [GetSystemRadioStateDelegate])
+    $setState = $mrs::GetDelegateForFunctionPointer($vtable[6], [SetSystemRadioStateDelegate])
+
+    $oldState, $p2, $p3 = 0, 0, 0
+    $hr = $getState.Invoke($comPtr, [ref]$oldState, [ref]$p2, [ref]$p3)
+    if ($hr -ne 0) { throw "GetState failed" }
+
+    $newState = if ($oldState -eq 0) { 1 } else { 0 }
+    $hr = $setState.Invoke($comPtr, $newState)
+    if ($hr -ne 0) { throw "SetState failed" }
+
+    $null = $release.Invoke($comPtr)
+    Write-Output $(if ($newState -eq 1) { "Off" } else { "On" })
+
+} catch {
     Write-Output "AccessDenied"
-    exit
 }
-
-$radios = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
-$anyRadioOn = $false
-foreach ($radio in $radios) {
-    if ($radio.Kind -ne 'Cellular' -and $radio.State -eq 'On') {
-        $anyRadioOn = $true
-        break
-    }
+finally {
+    [NativeMethods]::CoUninitialize()
 }
-
-$newState = if ($anyRadioOn) { 'Off' } else { 'On' }
-$newRadioState = [Windows.Devices.Radios.RadioState]::$newState
-foreach ($radio in $radios) {
-    if ($radio.Kind -ne 'Cellular') {
-        $result = Await ($radio.SetStateAsync($newRadioState)) ([Windows.Devices.Radios.RadioAccessStatus])
-    }
-}
-
-Write-Output $newState
 """
-
     try:
         result = subprocess.run(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
@@ -180,19 +189,20 @@ Write-Output $newState
 
         output = result.stdout.strip()
         err = result.stderr.strip()
+
         if "AccessDenied" in output or "AccessDenied" in err:
-            logger.warning("Airplane mode toggle requires additional Windows radio/location access.")
+            logger.warning("Airplane mode toggle requires administrator privileges.")
             return
-        if result.returncode != 0 or err:
-            logger.error("Airplane mode PowerShell call failed (%s): %s", result.returncode, err or "no stderr")
+        if result.returncode != 0 and err and "AccessDenied" not in err:
+            logger.error("Airplane mode PowerShell call failed (%s): %s", result.returncode, err)
             return
 
-        logger.info("Airplane mode toggled. New state: %s", "off" if output == "On" else "on")
+        logger.info("Airplane mode toggled (COM). New state: %s", output.lower())
+
     except subprocess.TimeoutExpired:
         logger.error("Airplane mode PowerShell call timed out.")
     except Exception as exc:
         logger.error("Could not toggle airplane mode: %s", exc)
-
 
 def toggle_notifications() -> None:
     try:
@@ -206,7 +216,6 @@ def toggle_notifications() -> None:
         logger.error("Could not toggle notifications via UI automation: %s", exc)
         subprocess.run(["start", SYSTEM_TOGGLE_SETTINGS.ui.notifications_uri], shell=True)
 
-
 def hotkeys() -> None:
     logger.info("Hotkey mode started.")
     keyboard.add_hotkey(SYSTEM_TOGGLE_SETTINGS.hotkeys.mute, toggle_mute)
@@ -219,4 +228,8 @@ def hotkeys() -> None:
 
 
 if __name__ == "__main__":
+    if not(bool(ctypes.windll.shell32.IsUserAnAdmin())):
+        logger.error("This script requires administrative privileges.")
+    logger.info("IsAdmin: %s", bool(ctypes.windll.shell32.IsUserAnAdmin()))
+
     hotkeys()
