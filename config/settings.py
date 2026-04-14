@@ -361,6 +361,38 @@ def _load_root_config() -> dict:
         return {}
 
 
+class AvatarSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = _load_root_config().get("avatar", {}).get("enabled", True)
+    window_title: str = _load_root_config().get("avatar", {}).get(
+        "window_title", "WavyOS Avatar"
+    )
+    window_width: int = _load_root_config().get("avatar", {}).get("window_width", 360)
+    window_height: int = _load_root_config().get("avatar", {}).get(
+        "window_height", 460
+    )
+    topmost: bool = _load_root_config().get("avatar", {}).get("topmost", True)
+    tick_interval_seconds: float = _load_root_config().get("avatar", {}).get(
+        "tick_interval_seconds", 0.15
+    )
+    transient_state_seconds: float = _load_root_config().get("avatar", {}).get(
+        "transient_state_seconds", 1.5
+    )
+    error_state_seconds: float = _load_root_config().get("avatar", {}).get(
+        "error_state_seconds", 3.0
+    )
+    idle_status_text: str = "Жду команд"
+    listening_status_text: str = "Слушаю"
+    thinking_status_text: str = "Думаю"
+    executing_status_text: str = "Выполняю"
+    speaking_status_text: str = "Отвечаю"
+    success_status_text: str = "Команда выполнена"
+    unknown_status_text: str = "Не удалось распознать команду"
+    error_status_text: str = "Произошла ошибка"
+    image_path: Path = ROOT_DIR / "src" / "images" / "mascot.png"
+
+
 class LLMSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -415,6 +447,7 @@ class Settings(BaseModel):
     desktop_manager: DesktopManagerSettings = DesktopManagerSettings()
     app_manager: AppManagerSettings = AppManagerSettings()
     logging: LoggingSettings = LoggingSettings()
+    avatar: AvatarSettings = AvatarSettings()
     llm: LLMSettings = LLMSettings()
     stt: STTSettings = STTSettings()
 

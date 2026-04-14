@@ -13,6 +13,7 @@ from config import settings
 from prompts import build_command_prompt, KWARGS_PROMPT 
 from app_logging import get_logger
 from commands.commands_registry import COMMAND_POOL
+from avatar.src.avatar_service import AvatarService, build_avatar_service
 
 logger: logging.Logger = get_logger(__name__)
 # logging.getLogger().setLevel(logging.ERROR)
@@ -33,6 +34,7 @@ class App:
         self.command_pool: dict = command_pool
         self.queue: q.Queue[Command] = q.Queue()
         self.text_processor: Callable[[str], str | None] = self._build_text_processor()
+        self.avatar_service: AvatarService = build_avatar_service()
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
@@ -75,17 +77,21 @@ class App:
             )
 
             if cmd_name == "#":
+                self.avatar_service.on_command_rejected()
                 continue
 
             command_fn = self.command_pool.get(cmd_name)
             if command_fn:
+                self.avatar_service.on_command_started(cmd_name)
                 try:
                     if inspect.iscoroutinefunction(command_fn):
                         asyncio.run(command_fn(**kwargs))
                     else:
                         command_fn(**kwargs)
+                    self.avatar_service.on_command_succeeded(cmd_name)
                     logger.info("Work is done")
                 except Exception:
+                    self.avatar_service.on_command_failed(str(cmd_data))
                     logger.exception("Exception caught while executing command")
 
     def _run_loop_in_thread(
@@ -100,8 +106,12 @@ class App:
     def start(self) -> None:
         """Start voice processing and the command execution loop."""
 
+        self.avatar_service.start()
         self.stop_event, self.recorder_thread = run_voice_processing(
-            self.cfg.stt.model_dump(), self.queue, self.text_processor
+            self.cfg.stt.model_dump(),
+            self.queue,
+            self.text_processor,
+            status_callback=self.avatar_service.handle_stt_status,
         )
         self.stop_event, self.loop_thread = self._run_loop_in_thread(
             self.stop_event, self.queue
@@ -117,6 +127,7 @@ class App:
 
         self.recorder_thread.join()
         self.loop_thread.join()
+        self.avatar_service.stop()
 
 
 if __name__ == "__main__":

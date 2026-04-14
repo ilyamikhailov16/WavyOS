@@ -16,6 +16,7 @@ def run_audio_recorder(
     stop_event: th.Event,
     queue: Optional[q.Queue[Command]],
     process_text_func: Optional[Callable[[str], Optional[str]]],
+    status_callback: Optional[Callable[[str], None]] = None,
     **kwargs,
 ) -> None:
     """
@@ -24,10 +25,20 @@ def run_audio_recorder(
     Designed to work in a separate thread, so it waits for a stop_event.
     """
 
+    def emit_status(status: str) -> None:
+        if status_callback is None:
+            return
+        try:
+            status_callback(status)
+        except Exception:
+            logger.exception("Exception in STT status callback")
+
     def callback(text: str) -> None:
         try:
             if queue is None:
                 return
+
+            logger.info("Raw STT text: %s", text)
 
             if process_text_func is not None:
                 command = process_text_func(text)
@@ -35,18 +46,29 @@ def run_audio_recorder(
                     logger.info(
                         "The message was not processed by the processor and was ignored"
                     )
+                    emit_status("processing_error")
                     return
 
             queue.put(command)
         except Exception:
+            emit_status("processing_error")
             logger.exception("Exception in STT callback")
 
     with AudioToTextRecorder(
         **kwargs,
-        on_vad_detect_start=lambda: logger.info("VAD: you can speek"),
+        on_vad_detect_start=lambda: (
+            logger.info("VAD: you can speek"),
+            emit_status("listening_started"),
+        ),
         on_recording_start=lambda: logger.info("recording start"),
-        on_recording_stop=lambda: logger.info("recording stop"),
-        on_transcription_start=lambda x: logger.info("transcription start"),
+        on_recording_stop=lambda: (
+            logger.info("recording stop"),
+            emit_status("recording_stopped"),
+        ),
+        on_transcription_start=lambda x: (
+            logger.info("transcription start"),
+            emit_status("transcription_started"),
+        ),
     ) as recorder:
         while not stop_event.is_set():
             recorder.text(callback)
@@ -56,6 +78,7 @@ def run_voice_processing(
     audio_recorder_params: dict,
     queue: Optional[q.Queue[str]] = None,
     process_text_func: Optional[Callable[[str], Optional[str]]] = None,
+    status_callback: Optional[Callable[[str], None]] = None,
 ) -> tuple[th.Event, th.Thread]:
     """
     Runs the voice processing thread.
@@ -65,7 +88,7 @@ def run_voice_processing(
     recorder_thread = th.Thread(
         target=run_audio_recorder,
         args=(stop_event, queue, process_text_func),
-        kwargs=audio_recorder_params,
+        kwargs={**audio_recorder_params, "status_callback": status_callback},
     )
     recorder_thread.start()
     return stop_event, recorder_thread
