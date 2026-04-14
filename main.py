@@ -117,6 +117,13 @@ class App:
             self.stop_event, self.queue
         )
 
+    def run_forever(self) -> None:
+        """Keep the app alive and process UI work owned by the main thread."""
+
+        while True:
+            self.avatar_service.process_ui_events()
+            time.sleep(0.05)
+
     def stop(self) -> None:
         """Request shutdown and wait for worker threads to finish."""
 
@@ -135,8 +142,7 @@ if __name__ == "__main__":
 
     try:
         app.start()
-        while True:
-            time.sleep(1)
+        app.run_forever()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     finally:

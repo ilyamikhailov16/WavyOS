@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import queue
 import threading
-from pathlib import Path
-
 from app_logging import get_logger
 from config import settings
 
@@ -48,6 +46,9 @@ class AvatarService:
         if self._thread:
             self._thread.join(timeout=3)
         self.renderer.stop()
+
+    def process_ui_events(self) -> None:
+        self.renderer.process_pending()
 
     def handle_stt_status(self, status: str) -> None:
         mapping = {

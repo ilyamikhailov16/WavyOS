@@ -3,13 +3,32 @@
 import logging
 import queue as q
 import threading as th
+import time
+from pathlib import Path
 from typing import Callable, Optional
+
 from RealtimeSTT import AudioToTextRecorder
 from commands.commands_schema import Command
+from config.settings import ROOT_DIR
+
+import soundfile as sf
 
 from app_logging import get_logger
 
 logger: logging.Logger = get_logger(__name__)
+DEBUG_AUDIO_DIR = ROOT_DIR / "stt_debug"
+
+
+def _save_debug_audio(audio_data) -> Path | None:
+    """Persist the latest transcribed audio chunk for debugging STT issues."""
+
+    if audio_data is None:
+        return None
+
+    DEBUG_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    path = DEBUG_AUDIO_DIR / f"last_recording_{time.strftime('%Y%m%d_%H%M%S')}.wav"
+    sf.write(str(path), audio_data, 16000)
+    return path
 
 
 def run_audio_recorder(
@@ -39,6 +58,15 @@ def run_audio_recorder(
                 return
 
             logger.info("Raw STT text: %s", text)
+            if text is None:
+                logger.info("STT returned no text; skipping command processing")
+                return
+            if not isinstance(text, str):
+                logger.info("STT returned unexpected payload %r; skipping", type(text))
+                return
+            if not text.strip():
+                logger.info("STT returned empty text; skipping command processing")
+                return
 
             if process_text_func is not None:
                 command = process_text_func(text)
@@ -54,6 +82,16 @@ def run_audio_recorder(
             emit_status("processing_error")
             logger.exception("Exception in STT callback")
 
+    def on_transcription_start(audio_data) -> None:
+        logger.info("transcription start")
+        emit_status("transcription_started")
+        try:
+            path = _save_debug_audio(audio_data)
+            if path is not None:
+                logger.info("Saved STT debug audio: %s", path)
+        except Exception:
+            logger.exception("Failed to save STT debug audio")
+
     with AudioToTextRecorder(
         **kwargs,
         on_vad_detect_start=lambda: (
@@ -65,10 +103,7 @@ def run_audio_recorder(
             logger.info("recording stop"),
             emit_status("recording_stopped"),
         ),
-        on_transcription_start=lambda x: (
-            logger.info("transcription start"),
-            emit_status("transcription_started"),
-        ),
+        on_transcription_start=on_transcription_start,
     ) as recorder:
         while not stop_event.is_set():
             recorder.text(callback)
