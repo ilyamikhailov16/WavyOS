@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import queue
-import threading
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -24,6 +23,9 @@ class BaseAvatarRenderer(ABC):
     @abstractmethod
     def stop(self) -> None:
         raise NotImplementedError
+
+    def process_pending(self) -> None:
+        return
 
 
 class NullAvatarRenderer(BaseAvatarRenderer):
@@ -65,38 +67,21 @@ class TkAvatarRenderer(BaseAvatarRenderer):
         self.window_size = window_size
         self.topmost = topmost
         self._queue: queue.Queue[AvatarSnapshot | None] = queue.Queue()
-        self._thread: threading.Thread | None = None
-        self._started = threading.Event()
+        self._root = None
+        self._state_label = None
+        self._status_label = None
+        self._mouth_canvas = None
+        self._mouth_rect = None
+        self._state_colors = dict(self.STATE_COLORS)
 
     def start(self, snapshot: AvatarSnapshot) -> None:
-        if self._thread and self._thread.is_alive():
+        if self._root is not None:
             return
-
-        self._thread = threading.Thread(
-            target=self._run_window,
-            name="avatar-renderer",
-            daemon=True,
-        )
-        self._thread.start()
-        self._started.wait(timeout=3)
-        self.render(snapshot)
-
-    def render(self, snapshot: AvatarSnapshot) -> None:
-        self._queue.put(snapshot)
-
-    def stop(self) -> None:
-        if not self._thread:
-            return
-        self._queue.put(None)
-        self._thread.join(timeout=3)
-
-    def _run_window(self) -> None:
         try:
             import tkinter as tk
             from PIL import Image, ImageTk
         except Exception as exc:
             logger.warning("Tk avatar renderer is unavailable: %s", exc)
-            self._started.set()
             return
 
         try:
@@ -152,40 +137,75 @@ class TkAvatarRenderer(BaseAvatarRenderer):
                 20, 10, 100, 18, fill="#E5E7EB", outline=""
             )
 
-            def apply_snapshot(snapshot: AvatarSnapshot) -> None:
-                state_label.configure(
-                    text=snapshot.mode.value.upper(),
-                    fg=self.STATE_COLORS.get(snapshot.mode, "#E5E7EB"),
-                )
-                status_label.configure(text=snapshot.detail or snapshot.status_text)
-                mouth_height = {0: 6, 1: 12, 2: 18}.get(snapshot.mouth_level, 6)
-                mouth_canvas.coords(
-                    mouth_rect,
-                    20,
-                    14 - (mouth_height // 2),
-                    100,
-                    14 + (mouth_height // 2),
-                )
-                mouth_canvas.itemconfigure(
-                    mouth_rect,
-                    fill=self.STATE_COLORS.get(snapshot.mode, "#E5E7EB"),
-                )
-
-            def pump_queue() -> None:
-                try:
-                    while True:
-                        item = self._queue.get_nowait()
-                        if item is None:
-                            root.destroy()
-                            return
-                        apply_snapshot(item)
-                except queue.Empty:
-                    pass
-                root.after(50, pump_queue)
-
-            self._started.set()
-            root.after(50, pump_queue)
-            root.mainloop()
+            self._root = root
+            self._state_label = state_label
+            self._status_label = status_label
+            self._mouth_canvas = mouth_canvas
+            self._mouth_rect = mouth_rect
+            self.render(snapshot)
+            self.process_pending()
         except Exception as exc:
             logger.warning("Tk avatar renderer failed to start: %s", exc)
-            self._started.set()
+            self._root = None
+
+    def render(self, snapshot: AvatarSnapshot) -> None:
+        self._queue.put(snapshot)
+
+    def stop(self) -> None:
+        if self._root is None:
+            return
+        try:
+            self._root.destroy()
+        except Exception as exc:
+            logger.warning("Tk avatar renderer failed to stop cleanly: %s", exc)
+        finally:
+            self._root = None
+            self._state_label = None
+            self._status_label = None
+            self._mouth_canvas = None
+            self._mouth_rect = None
+
+    def process_pending(self) -> None:
+        if self._root is None:
+            return
+        try:
+            while True:
+                item = self._queue.get_nowait()
+                if item is None:
+                    break
+                self._apply_snapshot(item)
+        except queue.Empty:
+            pass
+
+        try:
+            self._root.update_idletasks()
+            self._root.update()
+        except Exception:
+            return
+
+    def _apply_snapshot(self, snapshot: AvatarSnapshot) -> None:
+        if (
+            self._state_label is None
+            or self._status_label is None
+            or self._mouth_canvas is None
+            or self._mouth_rect is None
+        ):
+            return
+
+        self._state_label.configure(
+            text=snapshot.mode.value.upper(),
+            fg=self._state_colors.get(snapshot.mode, "#E5E7EB"),
+        )
+        self._status_label.configure(text=snapshot.detail or snapshot.status_text)
+        mouth_height = {0: 6, 1: 12, 2: 18}.get(snapshot.mouth_level, 6)
+        self._mouth_canvas.coords(
+            self._mouth_rect,
+            20,
+            14 - (mouth_height // 2),
+            100,
+            14 + (mouth_height // 2),
+        )
+        self._mouth_canvas.itemconfigure(
+            self._mouth_rect,
+            fill=self._state_colors.get(snapshot.mode, "#E5E7EB"),
+        )
