@@ -23,3 +23,5 @@ def test_other_script_settings_are_available() -> None:
     assert settings.energy_saver.power.enabled_refresh_rate_hz > 0
     assert settings.system_toggle.ui.airplane_mode_timeout_seconds > 0
     assert settings.trash_tool.paths.downloads_dir_name == "Downloads"
+    assert settings.avatar.window_width > 0
+    assert settings.avatar.image_path.name == "mascot.png"

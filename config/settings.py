@@ -451,6 +451,7 @@ class Settings(BaseModel):
     desktop_manager: DesktopManagerSettings = DesktopManagerSettings()
     app_manager: AppManagerSettings = AppManagerSettings()
     logging: LoggingSettings = LoggingSettings()
+    avatar: AvatarSettings = AvatarSettings()
     llm: LLMSettings = LLMSettings()
     stt: STTSettings = STTSettings()
     tts: TTSSettings = TTSSettings()

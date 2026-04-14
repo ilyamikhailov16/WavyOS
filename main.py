@@ -26,19 +26,13 @@ from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
 
+from prompts import build_command_prompt, KWARGS_PROMPT 
+from app_logging import get_logger
+from commands.commands_registry import COMMAND_POOL
+from avatar.src.avatar_service import AvatarService, build_avatar_service
+
 logger: logging.Logger = get_logger(__name__)
 
-def _restart_application():
-    """Starts a new instance of the application with the same arguments."""
-    python = sys.executable
-    script = Path(sys.argv[0]).resolve()
-    args = sys.argv[1:]
-
-    subprocess.Popen(
-        [python, str(script)] + args,
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
-        cwd=script.parent
-    )
 
 class App:
     """Main application runner for speech-to-command processing."""
@@ -54,6 +48,7 @@ class App:
         self.command_pool: dict = command_pool
         self.queue: q.Queue[Command] = q.Queue()
         self.text_processor: Callable[[str], str | None] = self._build_text_processor()
+        self.avatar_service: AvatarService = build_avatar_service()
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
@@ -69,13 +64,13 @@ class App:
         """Build a text post-processor that maps raw STT text to a command token."""
         if self.cfg.llm.use_for_stt:
             return CommandProcessor(
-                command_name_processor=LLMProcessor(
+                command_name_processor = LLMProcessor(
                     base_url=self.cfg.llm.base_url,
                     api_key=self.cfg.llm.token,
                     model_path=self.cfg.llm.model,
                     system_prompt=build_command_prompt(self.command_pool),
                 ),
-                kwargs_processor=LLMProcessor(
+                kwargs_processor = LLMProcessor(
                     base_url=self.cfg.llm.base_url,
                     api_key=self.cfg.llm.token,
                     model_path=self.cfg.llm.model,
@@ -86,9 +81,6 @@ class App:
 
     def _run_loop(self, stop_event: th.Event, queue: q.Queue[str]) -> None:
         """Consume recognized commands from a queue and execute matching handlers."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         while not stop_event.is_set():
             try:
                 command = queue.get(timeout=0.5)
@@ -106,21 +98,21 @@ class App:
             )
 
             if cmd_name == "#":
+                self.avatar_service.on_command_rejected()
                 continue
 
             command_fn = self.command_pool.get(cmd_name)
             if command_fn:
+                self.avatar_service.on_command_started(cmd_name)
                 try:
-                    result = command_fn(**kwargs)
-                    if inspect.isawaitable(result):
-                        loop.run_until_complete(result)
-
-                    self.tts.stop()
-                    text = self._CMD2VOICE[cmd_name].format(**kwargs)
-                    self.tts.play(text)
-
+                    if inspect.iscoroutinefunction(command_fn):
+                        asyncio.run(command_fn(**kwargs))
+                    else:
+                        command_fn(**kwargs)
+                    self.avatar_service.on_command_succeeded(cmd_name)
                     logger.info("Work is done")
                 except Exception:
+                    self.avatar_service.on_command_failed(str(cmd_data))
                     logger.exception("Exception caught while executing command")
 
     def _run_loop_in_thread(
@@ -133,60 +125,29 @@ class App:
 
     def start(self) -> None:
         """Start voice processing and the command execution loop."""
+
+        self.avatar_service.start()
         self.stop_event, self.recorder_thread = run_voice_processing(
-            self.cfg.stt.model_dump(), self.queue, self.text_processor
+            self.cfg.stt.model_dump(),
+            self.queue,
+            self.text_processor,
+            status_callback=self.avatar_service.handle_stt_status,
         )
         self.stop_event, self.loop_thread = self._run_loop_in_thread(
             self.stop_event, self.queue
         )
 
-    def _join_worker_threads(self, timeout: float) -> None:
-        for name, thread in [
-            ("recorder_thread", self.recorder_thread),
-            ("loop_thread", self.loop_thread),
-        ]:
-            if thread and thread.is_alive():
-                thread.join(timeout=timeout)
-                if thread.is_alive():
-                    logger.warning(f"{name} did not finish within {timeout}s")
-
-    @staticmethod
-    def _cleanup_child_processes() -> None:
-        try:
-            current = psutil.Process()
-            children = current.children(recursive=True)
-
-            if children:
-                logger.info(f"Terminating {len(children)} child processes...")
-                for child in children:
-                    try:
-                        child.terminate()
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        continue
-
-                _, alive = psutil.wait_procs(children, timeout=1.5)
-                for proc in alive:
-                    try:
-                        proc.kill()
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        pass
-                logger.info("Child process cleanup completed")
-        except ImportError:
-            logger.warning("psutil not installed, skipping process cleanup")
-        except Exception as e:
-            logger.error(f"Error during process cleanup: {e}")
-
-    def stop(self, timeout: float = 3.0) -> None:
+    def stop(self) -> None:
         """Request shutdown and wait for worker threads to finish."""
         if not self.stop_event:
             return
 
         logger.info("App.stop(): signaling shutdown...")
         self.stop_event.set()
-        self._join_worker_threads(timeout)
-        self.tts.stop()
-        self._cleanup_child_processes()
-        logger.info("App.stop(): finished")
+
+        self.recorder_thread.join()
+        self.loop_thread.join()
+        self.avatar_service.stop()
 
 
 if __name__ == "__main__":
@@ -228,7 +189,6 @@ if __name__ == "__main__":
             except Exception as e:
                 logger.error(f"Shutdown error: {e}")
             finally:
-                _restart_application()
                 time.sleep(1)
                 QMetaObject.invokeMethod(
                     qt_app, "quit", Qt.ConnectionType.QueuedConnection
