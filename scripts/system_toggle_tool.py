@@ -34,11 +34,6 @@ def toggle_mute() -> None:
 
 
 def toggle_wifi() -> None:
-    """
-    Переключает Wi-Fi через WinRT Radio API (аналогично toggle_bluetooth).
-    Меняет только состояние радио, адаптер остаётся активным → плитка не исчезает.
-    Требует прав администратора и разрешений на доступ к радио.
-    """
     ps_script = r"""
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 
