@@ -7,6 +7,7 @@ import inspect
 from typing import Any, Callable, Optional
 
 from stt import LLMProcessor, run_voice_processing
+from tts import TTS
 from commands_schema import Command, CommandEmptyArgs
 from config import settings
 
@@ -36,6 +37,7 @@ class App:
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
+        self.tts: TTS = TTS()
 
     def _build_text_processor(self) -> Callable[[str], str | None]:
         """Build a text post-processor that maps raw STT text to a command token."""
@@ -76,6 +78,7 @@ class App:
                         asyncio.run(command_fn(**kwargs))
                     else:
                         command_fn(**kwargs)
+                    self.tts.voice_command(cmd_name, kwargs)
                     logger.info("Work is done")
                 except Exception:
                     logger.exception("Exception caught while executing command")
