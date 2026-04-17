@@ -27,5 +27,4 @@ class TTS:
 
     def play(self, text: str) -> None:
         self.stream.feed(text)
-        # self.stream.play_async()
-        self.stream.play(output_wavfile="piper_voicing_command.wav")
+        self.stream.play_async()

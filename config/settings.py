@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 class LLMProcessorSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    max_retries: int = 2
+    max_retries: int = 3
     retry_sleep: int = 1
 
 
@@ -390,13 +390,14 @@ class STTSettings(BaseModel):
         _load_root_config().get("stt", {}).get("compute_type", "float32")
     )
     device: str = _load_root_config().get("stt", {}).get("device", "cuda")
-    silero_sensitivity: float = 0.6
+    silero_sensitivity: float = _load_root_config().get("stt", {}).get("silero_sensitivity", 0.6)
+    webrtc_sensitivity: int = _load_root_config().get("stt", {}).get("webrtc_sensitivity", 3)
     silero_use_onnx: bool = True
-    silero_deactivity_detection: bool = False
-    post_speech_silence_duration: float = 2.0
-    min_gap_between_recordings: float = 1.0
-    min_length_of_recording: float = 1.0
-    pre_recording_buffer_duration: float = 0.2
+    silero_deactivity_detection: bool = _load_root_config().get("stt", {}).get("silero_deactivity_detection", False)
+    post_speech_silence_duration: float = _load_root_config().get("stt", {}).get("post_speech_silence_duration", 2.0)
+    min_gap_between_recordings: float = _load_root_config().get("stt", {}).get("min_gap_between_recordings", 1.0)
+    min_length_of_recording: float = _load_root_config().get("stt", {}).get("min_length_of_recording", 1.0)
+    pre_recording_buffer_duration: float = _load_root_config().get("stt", {}).get("pre_recording_buffer_duration", 0.2)
     no_log_file: bool = True
     spinner: bool = False
 

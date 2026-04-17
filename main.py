@@ -11,9 +11,9 @@ from tts import TTS
 from commands_schema import Command, CommandEmptyArgs
 from config import settings
 
-from prompts import build_system_prompt
+from prompts import build_command_prompt, KWARGS_PROMPT 
 from app_logging import get_logger
-from command_registry import COMMAND_POOL
+from commands.commands_registry import COMMAND_POOL
 
 logger: logging.Logger = get_logger(__name__)
 # logging.getLogger().setLevel(logging.ERROR)
@@ -42,11 +42,19 @@ class App:
     def _build_text_processor(self) -> Callable[[str], str | None]:
         """Build a text post-processor that maps raw STT text to a command token."""
         if self.cfg.llm.use_for_stt:
-            return LLMProcessor(
-                base_url=self.cfg.llm.base_url,
-                api_key=self.cfg.llm.token,
-                model_path=self.cfg.llm.model,
-                system_prompt=build_system_prompt(self.command_pool),
+            return CommandProcessor(
+                command_name_processor = LLMProcessor(
+                    base_url=self.cfg.llm.base_url,
+                    api_key=self.cfg.llm.token,
+                    model_path=self.cfg.llm.model,
+                    system_prompt=build_command_prompt(self.command_pool),
+                ),
+                kwargs_processor = LLMProcessor(
+                    base_url=self.cfg.llm.base_url,
+                    api_key=self.cfg.llm.token,
+                    model_path=self.cfg.llm.model,
+                    system_prompt=KWARGS_PROMPT,
+                ),
             )
         return lambda text: text
 
@@ -63,9 +71,9 @@ class App:
 
             cmd_name = cmd_data.command_name
             kwargs = (
-                cmd_data.kwargs
-                if cmd_data.kwargs and not isinstance(cmd_data.kwargs, CommandEmptyArgs)
-                else {}
+                {}
+                if isinstance(cmd_data.kwargs, CommandEmptyArgs)
+                else cmd_data.kwargs.model_dump()
             )
 
             if cmd_name == "#":
