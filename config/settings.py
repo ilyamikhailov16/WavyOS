@@ -402,6 +402,11 @@ class STTSettings(BaseModel):
     spinner: bool = False
 
 
+class TTSSettings(BaseModel):
+    voice_path: str = str(ROOT_DIR / "tts/models/piper/ru_RU-irina-medium.onnx")
+    language: str = "ru"
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -417,6 +422,7 @@ class Settings(BaseModel):
     logging: LoggingSettings = LoggingSettings()
     llm: LLMSettings = LLMSettings()
     stt: STTSettings = STTSettings()
+    tts: TTSSettings = TTSSettings()
 
 
 settings = Settings()
