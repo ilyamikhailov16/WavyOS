@@ -2,9 +2,7 @@ from RealtimeTTS import TextToAudioStream
 from RealtimeTTS.engines.edge_engine import EdgeEngine
 from RealtimeTTS.engines.gtts_engine import GTTSEngine, GTTSVoice
 from RealtimeTTS.engines.piper_engine import PiperEngine, PiperVoice
-from .phrase_registry import CMD2VOICE
 from pathlib import Path
-from typing import Any
 from app_logging import get_logger
 from config import settings
 import subprocess
@@ -14,6 +12,20 @@ logger = get_logger(__name__)
 
 
 def _load_piper_voice_model() -> None:
+    """
+    Ensure the Piper voice model is present locally.
+
+    Downloads the model using `piper.download_voices` if it is not found
+    at `settings.tts.piper_voice_path`.
+
+    Side effects:
+        - Creates files in the configured directory
+        - Executes a subprocess
+        - Requires network access
+
+    Raises:
+        subprocess.CalledProcessError: If download fails
+    """
     voice_path = Path(settings.tts.piper_voice_path)
     if voice_path.is_file():
         return
@@ -37,7 +49,19 @@ def _load_piper_voice_model() -> None:
 
 
 class TTS:
+    """
+    High-level text-to-speech manager using RealtimeTTS.
+
+    Initializes and prioritizes multiple TTS engines based on configuration.
+    Provides a unified interface for streaming and playback.
+
+    Attributes:
+        stream: TextToAudioStream instance handling synthesis and playback.
+        engines: Ordered list of initialized TTS engines.
+    """
+
     def __init__(self) -> None:
+        """Creates a TTS instance."""
         self._init_engines()
 
         self.stream = TextToAudioStream(
@@ -48,6 +72,12 @@ class TTS:
         logger.info("TTS initialized.")
 
     def _init_engines(self) -> None:
+        """
+        Initialize configured TTS engines in priority order.
+
+        Engines are loaded based on `settings.tts.supported_engines`.
+        The order determines fallback priority during synthesis.
+        """
         supported_engines = {engine: None for engine in settings.tts.supported_engines}
         if "edge" in supported_engines:
             supported_engines["edge"] = EdgeEngine()
@@ -66,8 +96,21 @@ class TTS:
         self.engines = list(supported_engines.values())
 
     def play(self, text: str) -> None:
+        """
+        Convert text to speech and play it.
+
+        Feeds the text into the audio stream and starts playback.
+
+        Args:
+            text: Input text to synthesize.
+
+        Notes:
+            - Playback is blocking until audio finishes.
+            - Calls are executed sequentially (no overlap).
+        """
         self.stream.feed(text)
         self.stream.play()
 
     def stop(self) -> None:
+        """Stops the playback of the synthesized audio stream immediately."""
         self.stream.stop()

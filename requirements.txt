@@ -26,3 +26,5 @@ playwright>=1.40,<2
 PyAutoGUI~=0.9.54
 pycaw
 pytest>=8,<9
+piper-tts
+realtimetts[edge, gtts, piper]
