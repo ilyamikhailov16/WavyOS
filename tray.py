@@ -14,8 +14,9 @@ class ColoredFormatter(logging.Formatter):
         "INFO": "\033[92m",
         "WARNING": "\033[93m",
         "ERROR": "\033[91m",
-        "RESET": "\033[0m"
+        "RESET": "\033[0m",
     }
+
     def format(self, record):
         color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
         message = super().format(record)
@@ -34,6 +35,7 @@ class AppState:
     def __init__(self):
         self.running_command = None
         self.icon = None
+
 
 state = AppState()
 
@@ -73,7 +75,9 @@ def run_command(icon, name: str, command: str):
 
     def _worker():
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=60
+            )
             if result.returncode == 0:
                 icon.icon = create_icon("green")
                 notify(name, "Выполнено успешно")
@@ -108,17 +112,30 @@ def run_tray():
         create_icon("blue"),
         "UniversalApp",
         menu=pystray.Menu(
-            Item("Команда 1", lambda i, item: run_command(i, "Команда 1", "echo Команда 1")),
-            Item("Команда 2", lambda i, item: run_command(i, "Команда 2", "echo Команда 2")),
-            Item("Тест ошибки", lambda i, item: run_command(i, "Тест ошибки", "python -c \"raise RuntimeError('тест')\"")),
+            Item(
+                "Команда 1",
+                lambda i, item: run_command(i, "Команда 1", "echo Команда 1"),
+            ),
+            Item(
+                "Команда 2",
+                lambda i, item: run_command(i, "Команда 2", "echo Команда 2"),
+            ),
+            Item(
+                "Тест ошибки",
+                lambda i, item: run_command(
+                    i, "Тест ошибки", "python -c \"raise RuntimeError('тест')\""
+                ),
+            ),
             Item("Выход", exit_app),
-        )
+        ),
     )
     state.icon = icon
 
     def on_ready(icon):
         icon.visible = True
-        notify("Вход в трей", "Приложение успешно вошло в системный трей и готово к работе")
+        notify(
+            "Вход в трей", "Приложение успешно вошло в системный трей и готово к работе"
+        )
         logger.info("Трей полностью готов")
 
     icon.run(setup=on_ready)
@@ -136,7 +153,7 @@ if __name__ == "__main__":
     PORT = 65234
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(('127.0.0.1', PORT))
+        s.bind(("127.0.0.1", PORT))
         state._lock_socket = s
     except OSError:
         logger.warning("Приложение уже запущено!")
@@ -145,7 +162,7 @@ if __name__ == "__main__":
                 0,
                 "Приложение уже работает в трее.\nНовый экземпляр закрыт.",
                 "UniversalApp",
-                0x40,  
+                0x40,
             )
         except Exception:
             pass
