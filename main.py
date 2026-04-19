@@ -5,6 +5,11 @@ from pathlib import Path
 import queue as q
 import asyncio
 import inspect
+
+from prompts import build_command_prompt, KWARGS_PROMPT
+from app_logging import get_logger
+from commands.commands_registry import COMMAND_POOL
+
 from typing import Any, Callable, Optional
 from PySide6.QtCore import QMetaObject, Qt
 from PySide6.QtWidgets import QApplication
@@ -12,10 +17,6 @@ from PySide6.QtWidgets import QApplication
 from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
-
-from prompts import build_command_prompt, KWARGS_PROMPT 
-from app_logging import get_logger
-from commands.commands_registry import COMMAND_POOL
 
 from src.gui.ipc_listener import IPCListener
 from src.gui.settings_window import SettingsWindow

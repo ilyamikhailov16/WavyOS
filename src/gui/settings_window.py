@@ -3,8 +3,17 @@
 import json
 import sys
 from pathlib import Path
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QCheckBox, QPushButton, QMessageBox, QGroupBox)
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QCheckBox,
+    QPushButton,
+    QMessageBox,
+    QGroupBox,
+)
 from PySide6.QtCore import Signal
 import logging
 
@@ -13,8 +22,10 @@ from config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
+
 class SettingsWindow(QWidget):
     shutdown_requested = Signal()
+
     def __init__(self, config_path: Path, parent=None):
         super().__init__(parent)
         self.config_path = config_path
@@ -52,7 +63,9 @@ class SettingsWindow(QWidget):
         stt_layout = QVBoxLayout()
 
         self.language_edit = QLineEdit()
-        self.use_llm_cb.setChecked(True) # по умолчанию True, переопределим при загрузке
+        self.use_llm_cb.setChecked(
+            True
+        )  # по умолчанию True, переопределим при загрузке
 
         stt_layout.addWidget(QLabel("Язык (ru/en):"))
         stt_layout.addWidget(self.language_edit)
@@ -76,7 +89,9 @@ class SettingsWindow(QWidget):
     def _load_from_file(self):
         """Читает JSON и заполняет UI. Безопасно для frozen-моделей."""
         if not self.config_path.exists():
-            QMessageBox.warning(self, "Ошибка", f"Файл настроек не найден: {self.config_path}")
+            QMessageBox.warning(
+                self, "Ошибка", f"Файл настроек не найден: {self.config_path}"
+            )
             return
 
         with open(self.config_path, "r", encoding="utf-8") as f:
@@ -111,14 +126,20 @@ class SettingsWindow(QWidget):
         try:
             Settings.model_validate(current)
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка валидации", f"Некорректные данные:\n{str(e)}")
+            QMessageBox.critical(
+                self, "Ошибка валидации", f"Некорректные данные:\n{str(e)}"
+            )
             return
 
         # Запись
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(current, f, indent=2, ensure_ascii=False)
 
-        QMessageBox.information(self, "Успех", "Настройки сохранены. Перезапустите приложение для применения.")
+        QMessageBox.information(
+            self,
+            "Успех",
+            "Настройки сохранены. Перезапустите приложение для применения.",
+        )
         self.close()
 
         self.shutdown_requested.emit()

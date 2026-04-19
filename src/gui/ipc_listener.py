@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 # Порт уже используется в tray.py для проверки "одного экземпляра"
 IPC_PORT = 65234
 
+
 class IPCListener(QObject):
     # Сигнал, который будет ловить GUI-окно
     open_settings_requested = Signal()
@@ -27,7 +28,9 @@ class IPCListener(QObject):
 
         # QSocketNotifier вызывает self._accept_connection при готовности сокета
         # SocketType.ReadNotify = готовность к чтению/приёму соединения
-        self.notifier = QSocketNotifier(self.server_socket.fileno(), QSocketNotifier.Type.Read, self)
+        self.notifier = QSocketNotifier(
+            self.server_socket.fileno(), QSocketNotifier.Type.Read, self
+        )
         self.notifier.activated.connect(self._accept_connection)
         logger.info(f"IPC Listener запущен на порту {IPC_PORT}")
 
