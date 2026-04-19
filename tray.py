@@ -2,11 +2,12 @@ import threading
 import logging
 import time
 import socket
+import ctypes
 from PIL import Image, ImageDraw, ImageFont
 import pystray
 from pystray import MenuItem as Item
 import subprocess
-from plyer import notification
+
 
 class ColoredFormatter(logging.Formatter):
     COLORS = {
@@ -20,6 +21,7 @@ class ColoredFormatter(logging.Formatter):
         message = super().format(record)
         return f"{color}{message}{self.COLORS['RESET']}"
 
+
 logger = logging.getLogger("tray_app")
 handler = logging.StreamHandler()
 formatter = ColoredFormatter("[%(asctime)s] [%(levelname)s] %(message)s", "%H:%M:%S")
@@ -27,12 +29,14 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+
 class AppState:
     def __init__(self):
         self.running_command = None
         self.icon = None
 
 state = AppState()
+
 
 def create_icon(color: str = "blue"):
     img = Image.new("RGB", (64, 64), color)
@@ -45,17 +49,17 @@ def create_icon(color: str = "blue"):
         pass
     return img
 
+
 def notify(title: str, message: str):
     try:
-        notification.notify(
-            title=title,
-            message=message,
-            app_name="UniversalApp",
-            timeout=5,
-        )
-        logger.info(f"Уведомление: {title}")
+        if state.icon is not None and getattr(state.icon, "visible", False):
+            state.icon.notify(message, title)
+            logger.info(f"Уведомление: {title}")
+        else:
+            logger.info(f"[pre-tray] {title}: {message}")
     except Exception as e:
         logger.error(f"Notify failed: {e}")
+
 
 def run_command(icon, name: str, command: str):
     if state.running_command:
@@ -64,6 +68,7 @@ def run_command(icon, name: str, command: str):
 
     state.running_command = name
     icon.icon = create_icon("yellow")
+    icon.title = f"UniversalApp — {name}"
     logger.info(f"{name} запущена")
 
     def _worker():
@@ -85,14 +90,17 @@ def run_command(icon, name: str, command: str):
         finally:
             time.sleep(2)
             icon.icon = create_icon("blue")
+            icon.title = "UniversalApp"
             state.running_command = None
 
     threading.Thread(target=_worker, daemon=True).start()
+
 
 def exit_app(icon, item):
     notify("Выход из трея", "Приложение успешно вышло из системного трея")
     logger.info("Приложение закрывается...")
     icon.stop()
+
 
 def run_tray():
     icon = pystray.Icon(
@@ -102,7 +110,7 @@ def run_tray():
         menu=pystray.Menu(
             Item("Команда 1", lambda i, item: run_command(i, "Команда 1", "echo Команда 1")),
             Item("Команда 2", lambda i, item: run_command(i, "Команда 2", "echo Команда 2")),
-            Item("Тест ошибки", lambda i, item: run_command(i, "Тест ошибки", "python -c 'raise RuntimeError(\"тест\")'")),
+            Item("Тест ошибки", lambda i, item: run_command(i, "Тест ошибки", "python -c \"raise RuntimeError('тест')\"")),
             Item("Выход", exit_app),
         )
     )
@@ -115,10 +123,12 @@ def run_tray():
 
     icon.run(setup=on_ready)
 
+
 def fake_gui():
     logger.info("Основной поток приложения работает")
     while True:
         time.sleep(1)
+
 
 if __name__ == "__main__":
     logger.info("Запуск UniversalApp...")
@@ -127,12 +137,17 @@ if __name__ == "__main__":
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('127.0.0.1', PORT))
-        s.close()
+        state._lock_socket = s
     except OSError:
         logger.warning("Приложение уже запущено!")
         try:
-            notification.notify(title="UniversalApp", message="Приложение уже работает в трее.\nНовый экземпляр закрыт.", app_name="UniversalApp", timeout=5)
-        except:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                "Приложение уже работает в трее.\nНовый экземпляр закрыт.",
+                "UniversalApp",
+                0x40,  
+            )
+        except Exception:
             pass
         exit(1)
 
