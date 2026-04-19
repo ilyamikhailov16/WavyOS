@@ -10,7 +10,7 @@ from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
 from commands.commands_registry import COMMAND_POOL
 
-from tts import TTS
+from tts import TTS, CMD2VOICE
 from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
@@ -37,7 +37,9 @@ class App:
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
+        self.tts_thread: Optional[th.Thread] = None
         self.tts: TTS = TTS()
+        self.tts_queue: q.Queue[str] = q.Queue()
 
     def _build_text_processor(self) -> Callable[[str], str | None]:
         """Build a text post-processor that maps raw STT text to a command token."""
@@ -57,6 +59,22 @@ class App:
                 ),
             )
         return lambda text: text
+
+    def _run_tts(self, stop_event: th.Event, queue: q.Queue[str]) -> None:
+        """
+        Consume text from a queue and voice it.
+        To voice text immediately call TTS.stop() before putting text into the queue.
+        """
+        while not stop_event.is_set():
+            try:
+                text = queue.get(timeout=0.5)
+            except q.Empty:
+                continue
+
+            try:
+                self.tts.play(text)
+            except Exception:
+                logger.exception("TTS failed")
 
     def _run_loop(self, stop_event: th.Event, queue: q.Queue[str]) -> None:
         """Consume recognized commands from a queue and execute matching handlers."""
@@ -86,7 +104,11 @@ class App:
                         asyncio.run(command_fn(**kwargs))
                     else:
                         command_fn(**kwargs)
-                    self.tts.voice_command(cmd_name, kwargs)
+
+                    self.tts.stop()
+                    text = CMD2VOICE[cmd_name].format(**kwargs)
+                    self.tts_queue.put(text)
+
                     logger.info("Work is done")
                 except Exception:
                     logger.exception("Exception caught while executing command")
@@ -109,6 +131,10 @@ class App:
         self.stop_event, self.loop_thread = self._run_loop_in_thread(
             self.stop_event, self.queue
         )
+        self.tts_thread = th.Thread(
+            target=self._run_tts, args=(self.stop_event, self.tts_queue)
+        )
+        self.tts_thread.start()
 
     def stop(self) -> None:
         """Request shutdown and wait for worker threads to finish."""
@@ -119,6 +145,7 @@ class App:
         self.stop_event.set()
 
         self.recorder_thread.join()
+        self.tts_thread.join()
         self.loop_thread.join()
 
 

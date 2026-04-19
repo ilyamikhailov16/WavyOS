@@ -65,13 +65,9 @@ class TTS:
             logger.info("The PiperEngine now supported by TTS.")
         self.engines = list(supported_engines.values())
 
-    def voice_command(self, cmd_name: str, cmd_kwargs: dict[str, Any]) -> None:
-        if cmd_name not in CMD2VOICE:
-            logger.warning(f"TTS doesn't support this command: {cmd_name}")
-            return
-
-        self.play(CMD2VOICE[cmd_name].format(**cmd_kwargs))
-
     def play(self, text: str) -> None:
         self.stream.feed(text)
         self.stream.play()
+
+    def stop(self) -> None:
+        self.stream.stop()
