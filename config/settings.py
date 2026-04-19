@@ -403,7 +403,9 @@ class STTSettings(BaseModel):
 
 
 class TTSSettings(BaseModel):
-    voice_path: str = str(ROOT_DIR / "tts/models/piper/ru_RU-irina-medium.onnx")
+    supported_engines: tuple[str, ...] = ("edge", "gtts", "piper")
+    piper_voice_path: str = str(ROOT_DIR / "tts/models/piper/ru_RU-irina-medium.onnx")
+    gtts_speed: float = 1.2
     language: str = "ru"
 
 
