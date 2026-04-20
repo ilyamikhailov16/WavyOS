@@ -27,12 +27,12 @@ class ScriptDescriptor:
 
 def _validate_input(descriptor: ScriptDescriptor) -> bool:
     if not descriptor.script_path.is_file():
-        logger.error(f"[run_script] Script not found: {full_path}")
+        logger.error(f"[run_script] Script not found: {descriptor.script_path}")
         return False
 
     if descriptor.script_type not in (".py", ".bat"):
         logger.error(
-            f"[run_script] Only .py and .bat scripts are supported. Got: '{full_path.name}'"
+            f"[run_script] Only .py and .bat scripts are supported. Got: '{descriptor.script_path.name}'"
         )
         return False
 
@@ -125,7 +125,7 @@ def run_script(
         is_async,
         strict,
         args=args,
-        kwargs=kwargs
+        kwargs=kwargs,
     )
 
     if not _validate_input(descriptor):
