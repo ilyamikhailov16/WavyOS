@@ -196,6 +196,9 @@ class ScriptRunnerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     default_script_path: Path = ROOT_DIR / "scripts"
+    timeout: float = 300
+    is_async: bool = True
+    strict: bool = True
 
 
 class EnergySaverPowerSettings(BaseModel):
