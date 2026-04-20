@@ -7,6 +7,19 @@ from pydantic import BaseModel, ConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
+@lru_cache(maxsize=1)
+def _load_root_config() -> dict:
+    config_path = ROOT_DIR / "config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 class LLMProcessorSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -195,10 +208,20 @@ class ScreenToolSettings(BaseModel):
 class ScriptRunnerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    default_script_path: Path = ROOT_DIR / "scripts"
-    timeout: float = 300
-    is_async: bool = True
-    strict: bool = True
+    default_script_path: Path = Path(
+        _load_root_config().get("script_runner", {}).get("base_dir")
+        or (ROOT_DIR / "scripts")
+    )
+    timeout: float = (
+        _load_root_config().get("script_runner", {}).get("timeout")
+        or 300
+    )
+    is_async: bool = (
+        _load_root_config().get("script_runner", {}).get("is_async", True)
+    )
+    strict: bool = (
+        _load_root_config().get("script_runner", {}).get("strict", False)
+    )
 
 
 class EnergySaverPowerSettings(BaseModel):
@@ -349,19 +372,6 @@ class LoggingSettings(BaseModel):
 
     level: str = "INFO"
     format: str = "%(levelname)s - %(message)s"
-
-
-@lru_cache(maxsize=1)
-def _load_root_config() -> dict:
-    config_path = ROOT_DIR / "config.json"
-    if not config_path.exists():
-        return {}
-    try:
-        with config_path.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
 
 
 class LLMSettings(BaseModel):
