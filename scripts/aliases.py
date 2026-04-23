@@ -1,100 +1,11 @@
 """
-Alias dictionaries and auxiliary data for AppManager.
+Auxiliary logic for AppManager.
 
-  APP_ALIASES          — Windows system utilities → .exe from PATH
-  APP_PROTOCOL_ALIASES — URI protocols (ms-settings:, epic://, …)
-  APP_SPECIAL_LAUNCH   — custom launch (Valorant, Roblox)
-  APP_CONSOLE_APPS     — .exe requiring CREATE_NEW_CONSOLE
-  APP_KNOWN_PATHS      — paths for applications outside the registry (Steam)
-  APP_NAME_ALIASES     — aliases → DisplayName in registry
-  TRANSLITERATION      — ru→en table (auto-resolving Russian names)
+  TRANSLITERATION — ru→en table (auto-resolving Russian names)
+
+App alias data (APP_ALIASES, APP_PROTOCOL_ALIASES, APP_CONSOLE_APPS,
+APP_NAME_ALIASES) has been moved to config.AppManagerSettings.
 """
-
-# ---------------------------------------------------------------------------
-# Windows system utilities
-# ---------------------------------------------------------------------------
-
-APP_ALIASES: dict[str, str] = {
-    "блокнот": "notepad.exe",
-    "notepad": "notepad.exe",
-    "калькулятор": "calc.exe",
-    "calc": "calc.exe",
-    "проводник": "explorer.exe",
-    "explorer": "explorer.exe",
-    "командная строка": "cmd.exe",
-    "cmd": "cmd.exe",
-    "терминал": "wt.exe",
-    "terminal": "wt.exe",
-    "диспетчер задач": "taskmgr.exe",
-    "task manager": "taskmgr.exe",
-    "реестр": "regedit.exe",
-    "regedit": "regedit.exe",
-    "paint": "mspaint.exe",
-    "mspaint": "mspaint.exe",
-    "wordpad": "wordpad.exe",
-}
-
-# ---------------------------------------------------------------------------
-# URI-protocols — can be opened with os.startfile()
-# ---------------------------------------------------------------------------
-
-APP_PROTOCOL_ALIASES: dict[str, str] = {
-    "settings": "ms-settings:",
-    "настройки": "ms-settings:",
-    "магазин": "ms-windows-store:",
-    "store": "ms-windows-store:",
-    "epic": "com.epicgames.launcher://",
-    "epic games": "com.epicgames.launcher://",
-    "эпик": "com.epicgames.launcher://",
-    "эпик геймс": "com.epicgames.launcher://",
-    "xbox": "xbox:",
-    "иксбокс": "xbox:",
-}
-
-# ---------------------------------------------------------------------------
-# Console application — require CREATE_NEW_CONSOLE
-# ---------------------------------------------------------------------------
-
-APP_CONSOLE_APPS: frozenset[str] = frozenset(
-    {
-        "cmd.exe",
-        "powershell.exe",
-        "pwsh.exe",
-        "wsl.exe",
-        "python.exe",
-        "pythonw.exe",
-        "node.exe",
-    }
-)
-
-# ---------------------------------------------------------------------------
-# Other application — alias → DisplayName in register
-# ---------------------------------------------------------------------------
-
-APP_NAME_ALIASES: dict[str, str] = {
-    # Browsers
-    "хром": "Google Chrome",
-    "chrome": "Google Chrome",
-    "гугл хром": "Google Chrome",
-    "фаерфокс": "Mozilla Firefox",
-    "firefox": "Mozilla Firefox",
-    "эдж": "Microsoft Edge",
-    "edge": "Microsoft Edge",
-    # Messengers
-    "телеграм": "Telegram",
-    "telegram": "Telegram",
-    "дискорд": "Discord",
-    "discord": "Discord",
-    # Media
-    "спотифай": "Spotify",
-    "spotify": "Spotify",
-    # Development
-    "vs code": "Microsoft Visual Studio Code",
-    "vscode": "Microsoft Visual Studio Code",
-    "code": "Microsoft Visual Studio Code",
-    "пайчарм": "PyCharm",
-    "pycharm": "PyCharm",
-}
 
 # ---------------------------------------------------------------------------
 # Transliteration ru → en

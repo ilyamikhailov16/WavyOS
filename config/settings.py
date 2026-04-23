@@ -339,6 +339,74 @@ class AppManagerSettings(BaseModel):
     launch_wait_s: float = 1.0
     subprocess_encoding: str = "utf-8"
 
+    # Windows system utilities: alias → exe from PATH
+    app_aliases: dict[str, str] = {
+        "блокнот": "notepad.exe",
+        "notepad": "notepad.exe",
+        "калькулятор": "calc.exe",
+        "calc": "calc.exe",
+        "проводник": "explorer.exe",
+        "explorer": "explorer.exe",
+        "командная строка": "cmd.exe",
+        "cmd": "cmd.exe",
+        "терминал": "wt.exe",
+        "terminal": "wt.exe",
+        "диспетчер задач": "taskmgr.exe",
+        "task manager": "taskmgr.exe",
+        "реестр": "regedit.exe",
+        "regedit": "regedit.exe",
+        "paint": "mspaint.exe",
+        "mspaint": "mspaint.exe",
+        "wordpad": "wordpad.exe",
+    }
+
+    # URI protocols opened with os.startfile()
+    protocol_aliases: dict[str, str] = {
+        "settings": "ms-settings:",
+        "настройки": "ms-settings:",
+        "магазин": "ms-windows-store:",
+        "store": "ms-windows-store:",
+        "epic": "com.epicgames.launcher://",
+        "epic games": "com.epicgames.launcher://",
+        "эпик": "com.epicgames.launcher://",
+        "эпик геймс": "com.epicgames.launcher://",
+        "xbox": "xbox:",
+        "иксбокс": "xbox:",
+    }
+
+    # Executables that require CREATE_NEW_CONSOLE to show their window
+    console_apps: frozenset[str] = frozenset({
+        "cmd.exe",
+        "powershell.exe",
+        "pwsh.exe",
+        "wsl.exe",
+        "python.exe",
+        "pythonw.exe",
+        "node.exe",
+    })
+
+    # Localized/shorthand alias → DisplayName in the Windows registry
+    name_aliases: dict[str, str] = {
+        "хром": "Google Chrome",
+        "chrome": "Google Chrome",
+        "гугл хром": "Google Chrome",
+        "фаерфокс": "Mozilla Firefox",
+        "firefox": "Mozilla Firefox",
+        "эдж": "Microsoft Edge",
+        "edge": "Microsoft Edge",
+        "телеграм": "Telegram",
+        "telegram": "Telegram",
+        "дискорд": "Discord",
+        "discord": "Discord",
+        "спотифай": "Spotify",
+        "spotify": "Spotify",
+        "vs code": "Microsoft Visual Studio Code",
+        "vscode": "Microsoft Visual Studio Code",
+        "code": "Microsoft Visual Studio Code",
+        "пайчарм": "PyCharm",
+        "pycharm": "PyCharm",
+    }
+
     # Custom launch: alias → (path_to_exe_with_%ENV%, arguments).
     # Used for applications that cannot be launched directly.
     special_launch: dict[str, tuple[str, list[str]]] = {

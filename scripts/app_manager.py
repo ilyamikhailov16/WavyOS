@@ -14,13 +14,7 @@ from typing import Any
 from app_logging import get_logger
 from config import settings
 
-from .aliases import (
-    APP_ALIASES,
-    APP_CONSOLE_APPS,
-    APP_NAME_ALIASES,
-    APP_PROTOCOL_ALIASES,
-    transliterate,
-)
+from .aliases import transliterate
 
 logger = get_logger(__name__)
 
@@ -356,20 +350,21 @@ class AppManager:
         Resolves name/alias into executable path or URI.
 
         Priority:
-          1. APP_PROTOCOL_ALIASES — URI protocols (ms-settings:, epic://, …)
-          2. APP_SPECIAL_LAUNCH   — special launch logic (Roblox, steam://)
-          3. APP_ALIASES          — system utilities (notepad, calc, …)
-          4. APP_NAME_ALIASES     — localized alias → DisplayName → registry cache
-          5. Registry cache       — normalized + translit + word-boundary
-          6. APP_KNOWN_PATHS      — known paths outside registry
-          7. Fallback             — return as-is
+          1. protocol_aliases — URI protocols (ms-settings:, epic://, …)
+          2. special_launch   — special launch logic (Roblox, steam://)
+          3. app_aliases      — system utilities (notepad, calc, …)
+          4. name_aliases     — localized alias → DisplayName → registry cache
+          5. Registry cache   — normalized + translit + word-boundary
+          6. known_paths      — known paths outside registry
+          7. Fallback         — return as-is
         """
         key = app_name.lower()
+        am = settings.app_manager
 
-        if uri := APP_PROTOCOL_ALIASES.get(key):
+        if uri := am.protocol_aliases.get(key):
             return uri
 
-        if special := settings.app_manager.special_launch.get(key):
+        if special := am.special_launch.get(key):
             exe_template, _args = special
             if exe_template.startswith("steam://"):
                 return exe_template
@@ -377,10 +372,10 @@ class AppManager:
             if Path(expanded).exists():
                 return expanded
 
-        if alias := APP_ALIASES.get(key):
+        if alias := am.app_aliases.get(key):
             return alias
 
-        registry_name = APP_NAME_ALIASES.get(key, app_name)
+        registry_name = am.name_aliases.get(key, app_name)
         if exe := self._lookup_exe(registry_name):
             return exe
 
@@ -567,7 +562,7 @@ class AppManager:
         exe_name = self._to_exe_name(resolved)
 
         # Console apps require CREATE_NEW_CONSOLE, otherwise window is hidden
-        is_console = exe_name.lower() in APP_CONSOLE_APPS
+        is_console = exe_name.lower() in settings.app_manager.console_apps
         creation_flags = subprocess.CREATE_NEW_CONSOLE if is_console else 0
 
         try:
