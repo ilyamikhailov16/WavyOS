@@ -135,10 +135,4 @@ def run_script(
 
     logger.info(f"[run_script] Running: {' '.join(cmd)}")
 
-    try:
-        result = subprocess.run(cmd, check=True)
-        logger.info(f"[run_script] Script exited with code {result.returncode}.")
-    except subprocess.CalledProcessError as exc:
-        logger.error(f"[run_script] Script failed with code {exc.returncode}.")
-    except Exception as exc:
-        logger.error(f"[run_script] Unexpected error: {exc}")
+    _execute_command(cmd, descriptor)
