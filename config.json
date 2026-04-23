@@ -23,5 +23,11 @@
         "timeout": 300,
         "is_async": true,
         "strict": false
+    },
+    "energy_saver": {
+        "enabled_lower_refresh_rate_hz_edit": 60
+    },
+    "screen_tool": {
+        "fps_recording_edit": 20
     }
 }

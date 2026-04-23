@@ -202,7 +202,7 @@ class ScreenToolSettings(BaseModel):
     paths: ScreenToolPathsSettings = ScreenToolPathsSettings()
     hotkeys: ScreenToolHotkeysSettings = ScreenToolHotkeysSettings()
     video_codec: str = "XVID"
-    fps: float = 20.0
+    fps: float = _load_root_config().get("script_runner", {}).get("timeout")
 
 
 class ScriptRunnerSettings(BaseModel):
@@ -229,7 +229,9 @@ class EnergySaverPowerSettings(BaseModel):
 
     enabled_threshold: int = 100
     disabled_threshold: int = 0
-    enabled_refresh_rate_hz: int = 60
+    enabled_lower_refresh_rate_hz: int = (
+        _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz", 60)
+    )
 
 
 class EnergySaverHotkeysSettings(BaseModel):
