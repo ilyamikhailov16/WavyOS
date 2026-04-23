@@ -213,8 +213,8 @@ class ScriptRunnerSettings(BaseModel):
         or (ROOT_DIR / "scripts")
     )
     timeout: float = (
-            _load_root_config().get("script_runner", {}).get("timeout")
-            or 300
+        _load_root_config().get("script_runner", {}).get("timeout")
+        or 300
     )
     is_async: bool = (
         _load_root_config().get("script_runner", {}).get("is_async", True)
