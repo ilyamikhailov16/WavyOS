@@ -59,3 +59,6 @@ downloads/
 
 # API key
 token.txt
+
+# Models
+tts/models/*

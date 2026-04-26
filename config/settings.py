@@ -417,6 +417,13 @@ class STTSettings(BaseModel):
     spinner: bool = False
 
 
+class TTSSettings(BaseModel):
+    supported_engines: tuple[str, ...] = ("edge", "gtts", "piper")
+    piper_voice_path: str = str(ROOT_DIR / "tts/models/piper/ru_RU-irina-medium.onnx")
+    gtts_speed: float = 1.2
+    language: str = "ru"
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -432,6 +439,7 @@ class Settings(BaseModel):
     logging: LoggingSettings = LoggingSettings()
     llm: LLMSettings = LLMSettings()
     stt: STTSettings = STTSettings()
+    tts: TTSSettings = TTSSettings()
 
 
 settings = Settings()

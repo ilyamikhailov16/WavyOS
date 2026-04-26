@@ -7,18 +7,20 @@ import asyncio
 import inspect
 from typing import Any, Callable, Optional
 
-from PySide6.QtCore import QMetaObject, Qt
-from PySide6.QtWidgets import QApplication
-
-from stt import LLMProcessor, CommandProcessor, run_voice_processing
-from commands.commands_schema import Command, CommandEmptyArgs
-from config import settings
 from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
 from commands.commands_registry import COMMAND_POOL
+
+from PySide6.QtCore import QMetaObject, Qt
+from PySide6.QtWidgets import QApplication
 from src.gui.ipc_listener import IPCListener
 from src.gui.settings_window import SettingsWindow
 from src.gui.utils import setup_force_exit_fallback
+
+from tts import TTS, CMD2VOICE
+from stt import LLMProcessor, CommandProcessor, run_voice_processing
+from commands.commands_schema import Command, CommandEmptyArgs
+from config import settings
 
 logger: logging.Logger = get_logger(__name__)
 
@@ -27,6 +29,12 @@ class App:
     """Main application runner for speech-to-command processing."""
 
     def __init__(self, cfg: Any, command_pool: dict) -> None:
+        """
+        Create an application instance.
+
+        Args:
+            cfg: Application configuration object (expects `.llm` and `.stt` sections).
+        """
         self.cfg: Any = cfg
         self.command_pool: dict = command_pool
         self.queue: q.Queue[Command] = q.Queue()
@@ -34,6 +42,7 @@ class App:
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
+        self.tts: TTS = TTS()
 
     def _build_text_processor(self) -> Callable[[str], str | None]:
         """Build a text post-processor that maps raw STT text to a command token."""
@@ -82,12 +91,17 @@ class App:
                         asyncio.run(command_fn(**kwargs))
                     else:
                         command_fn(**kwargs)
+
+                    self.tts.stop()
+                    text = CMD2VOICE[cmd_name].format(**kwargs)
+                    self.tts.play(text)
+
                     logger.info("Work is done")
                 except Exception:
                     logger.exception("Exception caught while executing command")
 
     def _run_loop_in_thread(
-            self, stop_event: th.Event, queue: q.Queue[str]
+        self, stop_event: th.Event, queue: q.Queue[str]
     ) -> tuple[th.Event, th.Thread]:
         """Start the command execution loop in a dedicated thread."""
         loop_thread = th.Thread(target=self._run_loop, args=(stop_event, queue))
@@ -148,6 +162,8 @@ class App:
             logger.warning("psutil not installed, skipping process cleanup")
         except Exception as e:
             logger.error(f"Error during process cleanup: {e}")
+
+        self.tts.stop()
 
         logger.info("App.stop(): finished")
 
