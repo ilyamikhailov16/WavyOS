@@ -1,7 +1,8 @@
-import time
+import sys
 import logging
-import queue as q
 import threading as th
+from pathlib import Path
+import queue as q
 import asyncio
 import inspect
 from typing import Any, Callable, Optional
@@ -10,13 +11,18 @@ from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
 from commands.commands_registry import COMMAND_POOL
 
+from PySide6.QtCore import QMetaObject, Qt
+from PySide6.QtWidgets import QApplication
+from src.gui.ipc_listener import IPCListener
+from src.gui.settings_window import SettingsWindow
+from src.gui.utils import setup_force_exit_fallback
+
 from tts import TTS, CMD2VOICE
 from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
 
 logger: logging.Logger = get_logger(__name__)
-# logging.getLogger().setLevel(logging.ERROR)
 
 
 class App:
@@ -29,7 +35,6 @@ class App:
         Args:
             cfg: Application configuration object (expects `.llm` and `.stt` sections).
         """
-
         self.cfg: Any = cfg
         self.command_pool: dict = command_pool
         self.queue: q.Queue[Command] = q.Queue()
@@ -87,8 +92,7 @@ class App:
                     else:
                         command_fn(**kwargs)
 
-                    if self.tts.stream.is_playing():
-                        self.tts.stop()
+                    self.tts.stop()
                     text = CMD2VOICE[cmd_name].format(**kwargs)
                     self.tts.play(text)
 
@@ -100,14 +104,12 @@ class App:
         self, stop_event: th.Event, queue: q.Queue[str]
     ) -> tuple[th.Event, th.Thread]:
         """Start the command execution loop in a dedicated thread."""
-
         loop_thread = th.Thread(target=self._run_loop, args=(stop_event, queue))
         loop_thread.start()
         return stop_event, loop_thread
 
     def start(self) -> None:
         """Start voice processing and the command execution loop."""
-
         self.stop_event, self.recorder_thread = run_voice_processing(
             self.cfg.stt.model_dump(), self.queue, self.text_processor
         )
@@ -115,29 +117,103 @@ class App:
             self.stop_event, self.queue
         )
 
-    def stop(self) -> None:
+    def stop(self, timeout: float = 3.0) -> None:
         """Request shutdown and wait for worker threads to finish."""
-
         if not self.stop_event:
             return
 
+        logger.info("App.stop(): signaling shutdown...")
         self.stop_event.set()
 
-        self.recorder_thread.join()
-        self.loop_thread.join()
+        # Join worker threads
+        for name, thread in [
+            ("recorder_thread", self.recorder_thread),
+            ("loop_thread", self.loop_thread),
+        ]:
+            if thread and thread.is_alive():
+                thread.join(timeout=timeout)
+                if thread.is_alive():
+                    logger.warning(f"{name} did not finish within {timeout}s")
 
-        if self.tts.stream.is_playing():
-            self.tts.stop()
+        # Cleanup child processes (RealtimeSTT + PyAudio)
+        try:
+            import psutil
+
+            current = psutil.Process()
+            children = current.children(recursive=True)
+
+            if children:
+                logger.info(f"Terminating {len(children)} child processes...")
+                for child in children:
+                    try:
+                        child.terminate()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+
+                _, alive = psutil.wait_procs(children, timeout=1.5)
+                for proc in alive:
+                    try:
+                        proc.kill()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+                logger.info("Child process cleanup completed")
+
+        except ImportError:
+            logger.warning("psutil not installed, skipping process cleanup")
+        except Exception as e:
+            logger.error(f"Error during process cleanup: {e}")
+
+        self.tts.stop()
+
+        logger.info("App.stop(): finished")
 
 
 if __name__ == "__main__":
+    # Initialize business logic
     app = App(settings, COMMAND_POOL)
+    app.start()
 
-    try:
-        app.start()
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
-    finally:
-        app.stop()
+    # Start Qt GUI event loop
+    qt_app = QApplication(sys.argv)
+
+    # IPC listener for tray commands
+    ipc = IPCListener()
+    ipc.start()
+
+    # Settings window
+    config_path = Path("config.json").resolve()
+    settings_win = SettingsWindow(config_path)
+
+    # Connect IPC signals to UI
+    ipc.open_settings_requested.connect(settings_win.show)
+    ipc.open_settings_requested.connect(settings_win.raise_)
+
+    def on_shutdown_requested():
+        """Handle graceful shutdown request from SettingsWindow."""
+        logger.info("Shutdown requested. Stopping background processes...")
+        settings_win.close()
+
+        if ipc.notifier:
+            ipc.notifier.setEnabled(False)
+
+        def _shutdown_worker():
+            try:
+                app.stop(timeout=3.0)
+                logger.info("Background processes stopped.")
+            except Exception as e:
+                logger.error(f"Shutdown error: {e}")
+            finally:
+                # Fallback hard exit after 10s
+                setup_force_exit_fallback(delay_seconds=10.0)
+                # Thread-safe Qt exit
+                QMetaObject.invokeMethod(
+                    qt_app, "quit", Qt.ConnectionType.QueuedConnection
+                )
+
+        th.Thread(target=_shutdown_worker, daemon=True).start()
+
+    settings_win.shutdown_requested.connect(on_shutdown_requested)
+    settings_win.hide()  # Show only on tray signal
+
+    logger.info("GUI started. Waiting for tray commands...")
+    sys.exit(qt_app.exec())

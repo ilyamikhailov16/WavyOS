@@ -113,4 +113,5 @@ class TTS:
 
     def stop(self) -> None:
         """Stops the playback of the synthesized audio stream immediately."""
-        self.stream.stop()
+        if self.stream.is_playing():
+            self.stream.stop()
