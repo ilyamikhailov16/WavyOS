@@ -5,6 +5,7 @@ from pathlib import Path
 import queue as q
 import asyncio
 import inspect
+import psutil
 from typing import Any, Callable, Optional
 
 from prompts import build_command_prompt, KWARGS_PROMPT
@@ -117,15 +118,7 @@ class App:
             self.stop_event, self.queue
         )
 
-    def stop(self, timeout: float = 3.0) -> None:
-        """Request shutdown and wait for worker threads to finish."""
-        if not self.stop_event:
-            return
-
-        logger.info("App.stop(): signaling shutdown...")
-        self.stop_event.set()
-
-        # Join worker threads
+    def _join_worker_threads(self, timeout: float) -> None:
         for name, thread in [
             ("recorder_thread", self.recorder_thread),
             ("loop_thread", self.loop_thread),
@@ -135,10 +128,9 @@ class App:
                 if thread.is_alive():
                     logger.warning(f"{name} did not finish within {timeout}s")
 
-        # Cleanup child processes (RealtimeSTT + PyAudio)
+    @staticmethod
+    def _cleanup_child_processes() -> None:
         try:
-            import psutil
-
             current = psutil.Process()
             children = current.children(recursive=True)
 
@@ -157,14 +149,21 @@ class App:
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         pass
                 logger.info("Child process cleanup completed")
-
         except ImportError:
             logger.warning("psutil not installed, skipping process cleanup")
         except Exception as e:
             logger.error(f"Error during process cleanup: {e}")
 
-        self.tts.stop()
+    def stop(self, timeout: float = 3.0) -> None:
+        """Request shutdown and wait for worker threads to finish."""
+        if not self.stop_event:
+            return
 
+        logger.info("App.stop(): signaling shutdown...")
+        self.stop_event.set()
+        self._join_worker_threads(timeout)
+        self.tts.stop()
+        self._cleanup_child_processes()
         logger.info("App.stop(): finished")
 
 
