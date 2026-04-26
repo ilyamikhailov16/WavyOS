@@ -71,6 +71,9 @@ class App:
 
     def _run_loop(self, stop_event: th.Event, queue: q.Queue[str]) -> None:
         """Consume recognized commands from a queue and execute matching handlers."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         while not stop_event.is_set():
             try:
                 command = queue.get(timeout=0.5)
@@ -93,10 +96,9 @@ class App:
             command_fn = self.command_pool.get(cmd_name)
             if command_fn:
                 try:
-                    if inspect.iscoroutinefunction(command_fn):
-                        asyncio.run(command_fn(**kwargs))
-                    else:
-                        command_fn(**kwargs)
+                    result = command_fn(**kwargs)
+                    if inspect.isawaitable(result):
+                        loop.run_until_complete(result)
 
                     self.tts.stop()
                     text = self._CMD2VOICE[cmd_name].format(**kwargs)
