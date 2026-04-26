@@ -10,7 +10,7 @@ from typing import Any, Callable, Optional
 
 from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
-from commands.commands_registry import COMMAND_POOL
+from commands.commands_registry import build_command_pool, AppManager, DesktopManager
 
 from PySide6.QtCore import QMetaObject, Qt
 from PySide6.QtWidgets import QApplication
@@ -18,7 +18,6 @@ from src.gui.ipc_listener import IPCListener
 from src.gui.settings_window import SettingsWindow
 from src.gui.utils import setup_force_exit_fallback
 
-from tts import TTS, CMD2VOICE
 from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
@@ -43,7 +42,13 @@ class App:
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
-        self.tts: TTS = TTS()
+        self._init_tts()
+
+    def _init_tts(self) -> None:
+        """Lazy import of TTS to avoid unnecessary initialization effects for children processes"""
+        from tts import TTS, CMD2VOICE
+        self.tts = TTS()
+        self._CMD2VOICE = CMD2VOICE
 
     def _build_text_processor(self) -> Callable[[str], str | None]:
         """Build a text post-processor that maps raw STT text to a command token."""
@@ -94,7 +99,7 @@ class App:
                         command_fn(**kwargs)
 
                     self.tts.stop()
-                    text = CMD2VOICE[cmd_name].format(**kwargs)
+                    text = self._CMD2VOICE[cmd_name].format(**kwargs)
                     self.tts.play(text)
 
                     logger.info("Work is done")
@@ -168,8 +173,12 @@ class App:
 
 
 if __name__ == "__main__":
+    app_manager = AppManager()
+    desktop_manager = DesktopManager()
+    command_pool = build_command_pool(app_manager, desktop_manager)
+
     # Initialize business logic
-    app = App(settings, COMMAND_POOL)
+    app = App(settings, command_pool)
     app.start()
 
     # Start Qt GUI event loop
