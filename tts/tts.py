@@ -93,7 +93,7 @@ class TTS:
             voice = PiperVoice(settings.tts.piper_voice_path)
             supported_engines["piper"] = PiperEngine(voice=voice)
             logger.info("The PiperEngine now supported by TTS.")
-        self.engines = list(supported_engines.values())
+        self.engines = [e for e in supported_engines.values() if e is not None]
 
     def play(self, text: str) -> None:
         """
@@ -105,11 +105,11 @@ class TTS:
             text: Input text to synthesize.
 
         Notes:
-            - Playback is blocking until audio finishes.
+            - Playback is non-blocking.
             - Calls are executed sequentially (no overlap).
         """
         self.stream.feed(text)
-        self.stream.play()
+        self.stream.play_async()
 
     def stop(self) -> None:
         """Stops the playback of the synthesized audio stream immediately."""
