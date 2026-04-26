@@ -35,7 +35,9 @@ class AppState:
     def __init__(self):
         self.running_command = None
         self.icon = None
-
+        self.worker_thread = None  
+        self.lock_socket = None  
+        self.command_lock = threading.Lock()  
 
 state = AppState()
 
@@ -64,11 +66,12 @@ def notify(title: str, message: str):
 
 
 def run_command(icon, name: str, command: str):
-    if state.running_command:
-        notify("Команда уже выполняется", f"{state.running_command} ещё выполняется")
-        return
+    with state.command_lock:
+        if state.running_command:
+            notify("Команда уже выполняется", f"{state.running_command} ещё выполняется")
+            return
+        state.running_command = name
 
-    state.running_command = name
     icon.icon = create_icon("yellow")
     icon.title = f"UniversalApp — {name}"
     logger.info(f"{name} запущена")
@@ -95,14 +98,34 @@ def run_command(icon, name: str, command: str):
             time.sleep(2)
             icon.icon = create_icon("blue")
             icon.title = "UniversalApp"
-            state.running_command = None
+            with state.command_lock:
+                state.running_command = None
 
-    threading.Thread(target=_worker, daemon=True).start()
+    t = threading.Thread(target=_worker, daemon=False)
+    state.worker_thread = t
+    t.start()
 
 
 def exit_app(icon, item):
     notify("Выход из трея", "Приложение успешно вышло из системного трея")
     logger.info("Приложение закрывается...")
+
+    worker = state.worker_thread
+    if worker is not None and worker.is_alive():
+        logger.info("Ожидание завершения текущей команды...")
+        worker.join(timeout=65)  
+        if worker.is_alive():
+            logger.warning("Worker не завершился вовремя, выходим всё равно")
+
+    if state.lock_socket is not None:
+        try:
+            state.lock_socket.close()
+            logger.info("Single-instance сокет закрыт")
+        except Exception as e:
+            logger.error(f"Ошибка при закрытии сокета: {e}")
+        finally:
+            state.lock_socket = None
+
     icon.stop()
 
 
@@ -154,7 +177,7 @@ if __name__ == "__main__":
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(("127.0.0.1", PORT))
-        state._lock_socket = s
+        state.lock_socket = s
     except OSError:
         logger.warning("Приложение уже запущено!")
         try:
@@ -171,4 +194,12 @@ if __name__ == "__main__":
     gui_thread = threading.Thread(target=fake_gui, daemon=True)
     gui_thread.start()
 
-    run_tray()
+    try:
+        run_tray()
+    finally:
+        if state.lock_socket is not None:
+            try:
+                state.lock_socket.close()
+            except Exception:
+                pass
+            state.lock_socket = None
