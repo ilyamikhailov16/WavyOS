@@ -19,7 +19,7 @@
         "model": "openai/gpt-oss-120b"
     },
     "script_runner": {
-        "base_dir": "C:/Users/User/Desktop/",
+        "default_script_path": "C:/Users/User/Desktop/",
         "timeout": 300,
         "is_async": true,
         "strict": false
@@ -43,5 +43,17 @@
         "assets_dir": "avatar/assets",
         "manifest_path": "avatar/assets/avatar_manifest.json",
         "animation_enabled": true
+    },
+    "app_manager": {
+        "winget_timeout_s": 120,
+        "uninstall_timeout_s": 120,
+        "launch_wait_s": 1.0,
+        "subprocess_encoding": "utf-8"
+    },
+    "browser": {
+        "default_choice": "default",
+        "custom_path": "",
+        "custom_engine": "chromium",
+        "custom_search_preset": ""
     }
 }
