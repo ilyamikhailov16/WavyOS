@@ -1,19 +1,23 @@
+import os
 import sys
 import logging
 import threading as th
+import time
 from pathlib import Path
 import queue as q
 import asyncio
+import subprocess
 import inspect
 import psutil
 from typing import Any, Callable, Optional
+
+from PySide6.QtCore import QMetaObject, Qt
+from PySide6.QtWidgets import QApplication
 
 from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
 from commands.commands_registry import build_command_pool, AppManager, DesktopManager
 
-from PySide6.QtCore import QMetaObject, Qt
-from PySide6.QtWidgets import QApplication
 from src.gui.ipc_listener import IPCListener
 from src.gui.settings_window import SettingsWindow
 from src.gui.utils import setup_force_exit_fallback
@@ -24,6 +28,17 @@ from config import settings
 
 logger: logging.Logger = get_logger(__name__)
 
+def _restart_application():
+    """Starts a new instance of the application with the same arguments."""
+    python = sys.executable
+    script = Path(sys.argv[0]).resolve()
+    args = sys.argv[1:]
+
+    subprocess.Popen(
+        [python, str(script)] + args,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+        cwd=script.parent
+    )
 
 class App:
     """Main application runner for speech-to-command processing."""
@@ -201,24 +216,24 @@ if __name__ == "__main__":
     def on_shutdown_requested():
         """Handle graceful shutdown request from SettingsWindow."""
         logger.info("Shutdown requested. Stopping background processes...")
-        settings_win.close()
+        settings_win.hide()
 
         if ipc.notifier:
             ipc.notifier.setEnabled(False)
 
         def _shutdown_worker():
             try:
-                app.stop(timeout=3.0)
+                app.stop(timeout=5.0)
                 logger.info("Background processes stopped.")
             except Exception as e:
                 logger.error(f"Shutdown error: {e}")
             finally:
-                # Fallback hard exit after 10s
-                setup_force_exit_fallback(delay_seconds=10.0)
-                # Thread-safe Qt exit
+                _restart_application()
+                time.sleep(1)
                 QMetaObject.invokeMethod(
                     qt_app, "quit", Qt.ConnectionType.QueuedConnection
                 )
+                setup_force_exit_fallback(delay_seconds=10.0)
 
         th.Thread(target=_shutdown_worker, daemon=True).start()
 
