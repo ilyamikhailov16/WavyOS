@@ -1,9 +1,12 @@
+import os
 import sys
 import logging
 import threading as th
+import signal
 from pathlib import Path
 import queue as q
 import asyncio
+import subprocess
 import inspect
 import psutil
 from typing import Any, Callable, Optional
@@ -185,7 +188,6 @@ class App:
 
     def stop(self, timeout: float = 3.0) -> None:
         """Request shutdown and wait for worker threads to finish."""
-
         if self._stopped:
             return
         self._stopped = True
@@ -196,6 +198,7 @@ class App:
             self._cleanup_child_processes()
             return
 
+        logger.info("App.stop(): signaling shutdown...")
         self.stop_event.set()
 
         self.recorder_thread.join()
