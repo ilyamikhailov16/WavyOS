@@ -14,7 +14,8 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from app_logging import get_logger
-from config import settings
+from config import settings, _load_root_config
+
 
 BROWSER_SETTINGS = settings.browser
 PRESETS = BROWSER_SETTINGS.presets
@@ -25,6 +26,13 @@ logger = get_logger(__name__)
 
 
 def resolve_config(website_name: str, input_selector: str | None = None) -> tuple[str, str | None]:
+    if BROWSER_SETTINGS.custom.search_preset:
+        preset = PRESETS.get(BROWSER_SETTINGS.custom.search_preset)
+        if preset:
+            url = preset.url
+            input_selector = input_selector or preset.input_selector
+            return url, input_selector
+
     preset = PRESETS.get(website_name)
     if preset:
         url = preset.url
@@ -232,6 +240,25 @@ def resolve_browser_launch_options(
         logger.warning("Fallback selected: Playwright Chromium will be used.")
         return "chromium", {"headless": not headed}, "Playwright Chromium", "chromium"
 
+    if browser == "custom":
+        custom_cfg = BROWSER_SETTINGS.custom
+        executable_path = Path(custom_cfg.path).expanduser() if custom_cfg.path else None
+
+        if executable_path and executable_path.exists():
+            engine = custom_cfg.engine
+            logger.info("Browser selection: custom %s-compatible browser", engine)
+            logger.info("Executable: %s", executable_path)
+            return (
+                engine,
+                {"headless": not headed, "executable_path": str(executable_path)},
+                f"Custom Browser ({executable_path.name})",
+                "custom",
+            )
+        else:
+            logger.warning("Custom browser path invalid or empty: %s", executable_path)
+            logger.warning("Fallback selected: Playwright Chromium will be used.")
+            return "chromium", {"headless": not headed}, "Playwright Chromium", "chromium"
+
     progid = get_windows_default_browser_progid()
     if progid:
         browser_key = map_progid_to_browser(progid)
@@ -303,6 +330,11 @@ async def open_in_browser(
     :param wait_after_ms: How long to wait after submitting or loading.
     :param screenshot: Optional path to save a screenshot after completion.
     """
+    if browser == "default":
+        cfg_browser = _load_root_config().get("browser", {}).get("default_choice")
+        if cfg_browser:
+            browser = cfg_browser
+            logger.info("Browser overridden by config.json: %s", browser)
     try:
         url, resolved_input_selector = resolve_config(website_name, input_selector)
         browser_name, launch_kwargs, browser_label, browser_key = resolve_browser_launch_options(browser, headed)
