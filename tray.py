@@ -8,6 +8,15 @@ import pystray
 from pystray import MenuItem as Item
 import subprocess
 
+def _send_ipc_command(command: str):
+    """Sends a command to the main process via a socket."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1.0)
+            s.connect(("127.0.0.1", 65234))  #
+            s.sendall(command.encode("utf-8"))
+    except (ConnectionRefusedError, OSError) as e:
+        logger.warning("Не удалось отправить команду через IPC: %s", e)
 
 class ColoredFormatter(logging.Formatter):
     COLORS = {
@@ -37,7 +46,8 @@ class AppState:
         self.icon = None
         self.worker_thread = None  
         self.lock_socket = None  
-        self.command_lock = threading.Lock()  
+        self.command_lock = threading.Lock()
+        self.ipc_port = 65234
 
 state = AppState()
 
@@ -149,6 +159,10 @@ def run_tray():
                     i, "Тест ошибки", "python -c \"raise RuntimeError('тест')\""
                 ),
             ),
+            Item(
+                "⚙ Настройки",
+                lambda i, item: _send_ipc_command("OPEN_SETTINGS")
+            ),
             Item("Выход", exit_app),
         ),
     )
@@ -163,7 +177,6 @@ def run_tray():
 
     icon.run(setup=on_ready)
 
-
 def fake_gui():
     logger.info("Основной поток приложения работает")
     while True:
@@ -176,7 +189,7 @@ if __name__ == "__main__":
     PORT = 65234
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", PORT))
+        s.bind(("127.0.0.2", PORT))
         state.lock_socket = s
     except OSError:
         logger.warning("Приложение уже запущено!")
