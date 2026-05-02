@@ -1,10 +1,13 @@
+import os
 import sys
 import logging
 import threading as th
+import time
 import signal
 from pathlib import Path
 import queue as q
 import asyncio
+import subprocess
 import inspect
 import psutil
 from typing import Any, Callable, Optional
@@ -15,6 +18,7 @@ from PySide6.QtWidgets import QApplication
 from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
 from commands.commands_registry import build_command_pool, AppManager, DesktopManager
+
 from src.gui.ipc_listener import IPCListener
 from src.gui.settings_window import SettingsWindow
 from src.gui.utils import setup_force_exit_fallback
@@ -26,6 +30,17 @@ from avatar.src.avatar_service import AvatarService, build_avatar_service
 
 logger: logging.Logger = get_logger(__name__)
 
+def _restart_application():
+    """Starts a new instance of the application with the same arguments."""
+    python = sys.executable
+    script = Path(sys.argv[0]).resolve()
+    args = sys.argv[1:]
+
+    subprocess.Popen(
+        [python, str(script)] + args,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+        cwd=script.parent
+    )
 
 class App:
     """Main application runner for speech-to-command processing."""
@@ -226,23 +241,29 @@ if __name__ == "__main__":
     )
     app.start()
 
+    # Start Qt GUI event loop
+    qt_app = QApplication(sys.argv)
+
     avatar_timer = QTimer()
     avatar_timer.timeout.connect(app.avatar_service.process_ui_events)
     avatar_timer.start(50)
 
+    # IPC listener for tray commands
     ipc = IPCListener()
     ipc.start()
 
+    # Settings window
     config_path = Path("config.json").resolve()
     settings_win = SettingsWindow(config_path)
 
+    # Connect IPC signals to UI
     ipc.open_settings_requested.connect(settings_win.show)
     ipc.open_settings_requested.connect(settings_win.raise_)
 
     def on_shutdown_requested():
         """Handle graceful shutdown request from SettingsWindow."""
         logger.info("Shutdown requested. Stopping background processes...")
-        settings_win.close()
+        settings_win.hide()
         avatar_timer.stop()
 
         if ipc.notifier:
@@ -250,7 +271,7 @@ if __name__ == "__main__":
 
         def _shutdown_worker():
             try:
-                app.stop(timeout=3.0)
+                app.stop(timeout=5.0)
                 logger.info("Background processes stopped.")
             except Exception as e:
                 logger.error(f"Shutdown error: {e}")
@@ -263,7 +284,7 @@ if __name__ == "__main__":
         th.Thread(target=_shutdown_worker, daemon=True).start()
 
     settings_win.shutdown_requested.connect(on_shutdown_requested)
-    settings_win.hide()
+    settings_win.hide()  # Show only on tray signal
 
     logger.info("GUI started. Waiting for tray commands...")
     signal.signal(signal.SIGINT, request_qt_shutdown)
