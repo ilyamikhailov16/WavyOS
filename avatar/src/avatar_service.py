@@ -156,6 +156,9 @@ def build_avatar_service() -> AvatarService:
     if avatar_cfg.enabled:
         renderer = TkAvatarRenderer(
             image_path=avatar_cfg.image_path,
+            assets_dir=avatar_cfg.assets_dir,
+            manifest_path=avatar_cfg.manifest_path,
+            animation_enabled=avatar_cfg.animation_enabled,
             window_title=avatar_cfg.window_title,
             window_size=(avatar_cfg.window_width, avatar_cfg.window_height),
             topmost=avatar_cfg.topmost,
