@@ -30,12 +30,20 @@ logger: logging.Logger = get_logger(__name__)
 class App:
     """Main application runner for speech-to-command processing."""
 
-    def __init__(self, cfg: Any, command_pool: dict) -> None:
+    def __init__(
+        self,
+        cfg: Any,
+        command_pool: dict,
+        *,
+        on_avatar_window_closed: Callable[[], None] | None = None,
+    ) -> None:
         self.cfg: Any = cfg
         self.command_pool: dict = command_pool
         self.queue: q.Queue[Command] = q.Queue()
         self.text_processor: Callable[[str], str | None] = self._build_text_processor()
-        self.avatar_service: AvatarService = build_avatar_service()
+        self.avatar_service: AvatarService = build_avatar_service(
+            on_avatar_window_closed=on_avatar_window_closed,
+        )
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
@@ -198,14 +206,25 @@ class App:
 
 
 if __name__ == "__main__":
+    qt_app = QApplication(sys.argv)
+
+    def request_qt_shutdown(*_args):
+        QMetaObject.invokeMethod(
+            qt_app,
+            "quit",
+            Qt.ConnectionType.QueuedConnection,
+        )
+
     app_manager = AppManager()
     desktop_manager = DesktopManager()
     command_pool = build_command_pool(app_manager, desktop_manager)
 
-    app = App(settings, command_pool)
+    app = App(
+        settings,
+        command_pool,
+        on_avatar_window_closed=request_qt_shutdown,
+    )
     app.start()
-
-    qt_app = QApplication(sys.argv)
 
     avatar_timer = QTimer()
     avatar_timer.timeout.connect(app.avatar_service.process_ui_events)
@@ -247,13 +266,6 @@ if __name__ == "__main__":
     settings_win.hide()
 
     logger.info("GUI started. Waiting for tray commands...")
-    def request_qt_shutdown(*_args):
-        QMetaObject.invokeMethod(
-            qt_app,
-            "quit",
-            Qt.ConnectionType.QueuedConnection,
-        )
-
     signal.signal(signal.SIGINT, request_qt_shutdown)
     signal.signal(signal.SIGTERM, request_qt_shutdown)
 
