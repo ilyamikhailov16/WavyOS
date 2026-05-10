@@ -233,6 +233,10 @@ class EnergySaverPowerSettings(BaseModel):
         _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz", 60)
     )
 
+    @property
+    def enabled_refresh_rate_hz(self) -> int:
+        return self.enabled_lower_refresh_rate_hz
+
 
 class EnergySaverHotkeysSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -418,7 +422,18 @@ class AvatarSettings(BaseModel):
     success_status_text: str = "Команда выполнена"
     unknown_status_text: str = "Не удалось распознать команду"
     error_status_text: str = "Произошла ошибка"
-    image_path: Path = ROOT_DIR / "src" / "images" / "mascot.png"
+    image_path: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
+        "image_path", "src/images/mascot.png"
+    )
+    assets_dir: Path = ROOT_DIR / _load_root_config().get(
+        "avatar", {}
+    ).get("assets_dir", "avatar/assets")
+    manifest_path: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
+        "manifest_path", "avatar/assets/avatar_manifest.json"
+    )
+    animation_enabled: bool = _load_root_config().get("avatar", {}).get(
+        "animation_enabled", True
+    )
 
 
 class LLMSettings(BaseModel):
