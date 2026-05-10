@@ -6,7 +6,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from app_logging import get_logger
 
@@ -158,6 +158,7 @@ class TkAvatarRenderer(BaseAvatarRenderer):
         assets_dir: str | Path | None = None,
         manifest_path: str | Path | None = None,
         animation_enabled: bool = True,
+        on_window_closed: Callable[[], None] | None = None,
         window_title: str = "WavyOS Avatar",
         window_size: tuple[int, int] = (360, 460),
         topmost: bool = True,
@@ -166,6 +167,7 @@ class TkAvatarRenderer(BaseAvatarRenderer):
         self.assets_dir = Path(assets_dir) if assets_dir else None
         self.manifest_path = Path(manifest_path) if manifest_path else None
         self.animation_enabled = animation_enabled
+        self.on_window_closed = on_window_closed
         self.window_title = window_title
         self.window_size = window_size
         self.topmost = topmost
@@ -179,10 +181,12 @@ class TkAvatarRenderer(BaseAvatarRenderer):
         self._image_photo = None
         self._current_snapshot: AvatarSnapshot | None = None
         self._display_size: tuple[int, int] = (0, 0)
+        self._closed = False
 
     def start(self, snapshot: AvatarSnapshot) -> None:
         if self._root is not None:
             return
+        self._closed = False
         try:
             import tkinter as tk
             from PIL import Image, ImageTk
@@ -193,6 +197,7 @@ class TkAvatarRenderer(BaseAvatarRenderer):
         try:
             root = tk.Tk()
             root.title(self.window_title)
+            root.protocol("WM_DELETE_WINDOW", self._handle_window_closed)
             width, height = self.window_size
             root.geometry(f"{width}x{height}")
             root.resizable(False, False)
@@ -207,10 +212,10 @@ class TkAvatarRenderer(BaseAvatarRenderer):
             image = self._compose_image(snapshot) or Image.open(self.image_path).convert("RGBA")
             image.thumbnail((width - 32, 260))
             self._display_size = image.size
-            image_photo = ImageTk.PhotoImage(image)
 
-            image_label = tk.Label(frame, image=image_photo, bg="#111827")
-            self._image_photo = image_photo
+            self._root = root
+            self._image_photo = ImageTk.PhotoImage(image, master=root)
+            image_label = tk.Label(frame, image=self._image_photo, bg="#111827")
             image_label.pack(pady=(0, 12))
 
             state_label = tk.Label(
@@ -233,7 +238,6 @@ class TkAvatarRenderer(BaseAvatarRenderer):
             )
             status_label.pack(pady=(8, 10))
 
-            self._root = root
             self._image_label = image_label
             self._state_label = state_label
             self._status_label = status_label
@@ -241,30 +245,35 @@ class TkAvatarRenderer(BaseAvatarRenderer):
             self.process_pending()
         except Exception as exc:
             logger.warning("Tk avatar renderer failed to start: %s", exc)
-            self._root = None
-            self._composer = None
+            self._clear_widgets()
 
     def render(self, snapshot: AvatarSnapshot) -> None:
+        if self._closed:
+            return
         self._queue.put(snapshot)
 
     def stop(self) -> None:
+        self._closed = True
         if self._root is None:
+            self._clear_widgets()
             return
         try:
             self._root.destroy()
         except Exception as exc:
             logger.warning("Tk avatar renderer failed to stop cleanly: %s", exc)
         finally:
-            self._root = None
-            self._image_label = None
-            self._state_label = None
-            self._status_label = None
-            self._composer = None
-            self._image_photo = None
-            self._current_snapshot = None
+            self._clear_widgets()
+
+    def _handle_window_closed(self) -> None:
+        self.stop()
+        if self.on_window_closed is not None:
+            try:
+                self.on_window_closed()
+            except Exception:
+                logger.exception("Exception in avatar window close callback")
 
     def process_pending(self) -> None:
-        if self._root is None:
+        if self._closed or self._root is None:
             return
         updated = False
         try:
@@ -276,14 +285,25 @@ class TkAvatarRenderer(BaseAvatarRenderer):
                 updated = True
         except queue.Empty:
             pass
+        except Exception as exc:
+            logger.warning("Tk avatar renderer stopped after UI update failure: %s", exc)
+            self.stop()
+            return
 
         if self.animation_enabled and not updated and self._current_snapshot is not None:
-            self._apply_avatar_image(self._current_snapshot)
+            try:
+                self._apply_avatar_image(self._current_snapshot)
+            except Exception as exc:
+                logger.warning("Tk avatar renderer stopped after animation failure: %s", exc)
+                self.stop()
+                return
 
         try:
             self._root.update_idletasks()
             self._root.update()
-        except Exception:
+        except Exception as exc:
+            logger.warning("Tk avatar renderer stopped after root update failure: %s", exc)
+            self.stop()
             return
 
     def _apply_snapshot(self, snapshot: AvatarSnapshot) -> None:
@@ -328,7 +348,7 @@ class TkAvatarRenderer(BaseAvatarRenderer):
             return None
 
     def _apply_avatar_image(self, snapshot: AvatarSnapshot) -> None:
-        if self._image_label is None:
+        if self._closed or self._root is None or self._image_label is None:
             return
         image = self._compose_image(snapshot)
         if image is None:
@@ -339,5 +359,14 @@ class TkAvatarRenderer(BaseAvatarRenderer):
 
         from PIL import ImageTk
 
-        self._image_photo = ImageTk.PhotoImage(image)
+        self._image_photo = ImageTk.PhotoImage(image, master=self._root)
         self._image_label.configure(image=self._image_photo)
+
+    def _clear_widgets(self) -> None:
+        self._root = None
+        self._image_label = None
+        self._state_label = None
+        self._status_label = None
+        self._composer = None
+        self._image_photo = None
+        self._current_snapshot = None
