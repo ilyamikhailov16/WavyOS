@@ -28,6 +28,15 @@ def _find_executable(executable_name: str) -> str | None:
     if local_executable.is_file():
         return str(local_executable)
 
+    if sys.platform == "win32":
+        common_windows_paths = (
+            Path("C:/Program Files/MPV Player/mpv.exe"),
+            Path("C:/Program Files (x86)/MPV Player/mpv.exe"),
+        )
+        for common_path in common_windows_paths:
+            if common_path.name.lower() == script_name.lower() and common_path.is_file():
+                return str(common_path)
+
     return None
 
 
