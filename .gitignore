@@ -51,6 +51,7 @@ screenshot_*.png
 *.avi
 *.mp4
 *.mkv
+avatar/previews/
 
 # Local browser / automation state
 user-data/
