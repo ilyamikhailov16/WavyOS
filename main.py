@@ -8,12 +8,12 @@ import inspect
 import psutil
 from typing import Any, Callable, Optional
 
+from PySide6.QtCore import QMetaObject, Qt, QTimer
+from PySide6.QtWidgets import QApplication
+
 from prompts import build_command_prompt, KWARGS_PROMPT
 from app_logging import get_logger
 from commands.commands_registry import build_command_pool, AppManager, DesktopManager
-
-from PySide6.QtCore import QMetaObject, Qt
-from PySide6.QtWidgets import QApplication
 from src.gui.ipc_listener import IPCListener
 from src.gui.settings_window import SettingsWindow
 from src.gui.utils import setup_force_exit_fallback
@@ -21,6 +21,7 @@ from src.gui.utils import setup_force_exit_fallback
 from stt import LLMProcessor, CommandProcessor, run_voice_processing
 from commands.commands_schema import Command, CommandEmptyArgs
 from config import settings
+from avatar.src.avatar_service import AvatarService, build_avatar_service
 
 logger: logging.Logger = get_logger(__name__)
 
@@ -29,24 +30,20 @@ class App:
     """Main application runner for speech-to-command processing."""
 
     def __init__(self, cfg: Any, command_pool: dict) -> None:
-        """
-        Create an application instance.
-
-        Args:
-            cfg: Application configuration object (expects `.llm` and `.stt` sections).
-        """
         self.cfg: Any = cfg
         self.command_pool: dict = command_pool
         self.queue: q.Queue[Command] = q.Queue()
         self.text_processor: Callable[[str], str | None] = self._build_text_processor()
+        self.avatar_service: AvatarService = build_avatar_service()
         self.stop_event: Optional[th.Event] = None
         self.recorder_thread: Optional[th.Thread] = None
         self.loop_thread: Optional[th.Thread] = None
         self._init_tts()
 
     def _init_tts(self) -> None:
-        """Lazy import of TTS to avoid unnecessary initialization effects for children processes"""
+        """Lazy import of TTS to avoid unnecessary initialization effects for children processes."""
         from tts import TTS, CMD2VOICE
+
         self.tts = TTS()
         self._CMD2VOICE = CMD2VOICE
 
@@ -74,39 +71,46 @@ class App:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        while not stop_event.is_set():
-            try:
-                command = queue.get(timeout=0.5)
-            except q.Empty:
-                continue
-
-            cmd_data = command.command
-            logger.info("Recognised command: %s", cmd_data)
-
-            cmd_name = cmd_data.command_name
-            kwargs = (
-                {}
-                if isinstance(cmd_data.kwargs, CommandEmptyArgs)
-                else cmd_data.kwargs.model_dump()
-            )
-
-            if cmd_name == "#":
-                continue
-
-            command_fn = self.command_pool.get(cmd_name)
-            if command_fn:
+        try:
+            while not stop_event.is_set():
                 try:
-                    result = command_fn(**kwargs)
-                    if inspect.isawaitable(result):
-                        loop.run_until_complete(result)
+                    command = queue.get(timeout=0.5)
+                except q.Empty:
+                    continue
 
-                    self.tts.stop()
-                    text = self._CMD2VOICE[cmd_name].format(**kwargs)
-                    self.tts.play(text)
+                cmd_data = command.command
+                logger.info("Recognised command: %s", cmd_data)
 
-                    logger.info("Work is done")
-                except Exception:
-                    logger.exception("Exception caught while executing command")
+                cmd_name = cmd_data.command_name
+                kwargs = (
+                    {}
+                    if isinstance(cmd_data.kwargs, CommandEmptyArgs)
+                    else cmd_data.kwargs.model_dump()
+                )
+
+                if cmd_name == "#":
+                    self.avatar_service.on_command_rejected()
+                    continue
+
+                command_fn = self.command_pool.get(cmd_name)
+                if command_fn:
+                    self.avatar_service.on_command_started(cmd_name)
+                    try:
+                        result = command_fn(**kwargs)
+                        if inspect.isawaitable(result):
+                            loop.run_until_complete(result)
+
+                        self.tts.stop()
+                        text = self._CMD2VOICE[cmd_name].format(**kwargs)
+                        self.tts.play(text)
+
+                        self.avatar_service.on_command_succeeded(cmd_name)
+                        logger.info("Work is done")
+                    except Exception:
+                        self.avatar_service.on_command_failed(str(cmd_data))
+                        logger.exception("Exception caught while executing command")
+        finally:
+            loop.close()
 
     def _run_loop_in_thread(
         self, stop_event: th.Event, queue: q.Queue[str]
@@ -118,8 +122,12 @@ class App:
 
     def start(self) -> None:
         """Start voice processing and the command execution loop."""
+        self.avatar_service.start()
         self.stop_event, self.recorder_thread = run_voice_processing(
-            self.cfg.stt.model_dump(), self.queue, self.text_processor
+            self.cfg.stt.model_dump(),
+            self.queue,
+            self.text_processor,
+            status_callback=self.avatar_service.handle_stt_status,
         )
         self.stop_event, self.loop_thread = self._run_loop_in_thread(
             self.stop_event, self.queue
@@ -155,6 +163,7 @@ class App:
                         proc.kill()
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         pass
+
                 logger.info("Child process cleanup completed")
         except ImportError:
             logger.warning("psutil not installed, skipping process cleanup")
@@ -170,6 +179,7 @@ class App:
         self.stop_event.set()
         self._join_worker_threads(timeout)
         self.tts.stop()
+        self.avatar_service.stop()
         self._cleanup_child_processes()
         logger.info("App.stop(): finished")
 
@@ -179,22 +189,21 @@ if __name__ == "__main__":
     desktop_manager = DesktopManager()
     command_pool = build_command_pool(app_manager, desktop_manager)
 
-    # Initialize business logic
     app = App(settings, command_pool)
     app.start()
 
-    # Start Qt GUI event loop
     qt_app = QApplication(sys.argv)
 
-    # IPC listener for tray commands
+    avatar_timer = QTimer()
+    avatar_timer.timeout.connect(app.avatar_service.process_ui_events)
+    avatar_timer.start(50)
+
     ipc = IPCListener()
     ipc.start()
 
-    # Settings window
     config_path = Path("config.json").resolve()
     settings_win = SettingsWindow(config_path)
 
-    # Connect IPC signals to UI
     ipc.open_settings_requested.connect(settings_win.show)
     ipc.open_settings_requested.connect(settings_win.raise_)
 
@@ -202,6 +211,7 @@ if __name__ == "__main__":
         """Handle graceful shutdown request from SettingsWindow."""
         logger.info("Shutdown requested. Stopping background processes...")
         settings_win.close()
+        avatar_timer.stop()
 
         if ipc.notifier:
             ipc.notifier.setEnabled(False)
@@ -213,9 +223,7 @@ if __name__ == "__main__":
             except Exception as e:
                 logger.error(f"Shutdown error: {e}")
             finally:
-                # Fallback hard exit after 10s
                 setup_force_exit_fallback(delay_seconds=10.0)
-                # Thread-safe Qt exit
                 QMetaObject.invokeMethod(
                     qt_app, "quit", Qt.ConnectionType.QueuedConnection
                 )
@@ -223,7 +231,7 @@ if __name__ == "__main__":
         th.Thread(target=_shutdown_worker, daemon=True).start()
 
     settings_win.shutdown_requested.connect(on_shutdown_requested)
-    settings_win.hide()  # Show only on tray signal
+    settings_win.hide()
 
     logger.info("GUI started. Waiting for tray commands...")
     sys.exit(qt_app.exec())

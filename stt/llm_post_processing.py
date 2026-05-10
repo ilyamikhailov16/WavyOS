@@ -92,9 +92,11 @@ class CommandProcessor(BaseProcessor):
     def get_answer(self, user_prompt: str) -> BaseModel | None:
         """Extracting a command from text."""
 
+        logger.info("CommandProcessor input: %s", user_prompt)
         command = self.command_name_processor(user_prompt, CommandNameOnly)
         if command:
             command_name = command.command_name
+            logger.info("Resolved command_name: %s", command_name)
             kwargs_model = _COMMAND_TO_KWARGS_MODEL[command_name]
 
             if kwargs_model is CommandEmptyArgs:
@@ -111,5 +113,6 @@ class CommandProcessor(BaseProcessor):
                 )
 
             if kwargs_obj:
+                logger.info("Resolved kwargs: %s", kwargs_obj)
                 return build_command(command_name, kwargs_obj)
         return
