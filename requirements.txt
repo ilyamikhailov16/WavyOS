@@ -24,7 +24,7 @@ psutil>=7,<8
 pydantic>=2,<3
 playwright>=1.40,<2
 PyAutoGUI~=0.9.54
-pycaw~=20251023
+pycaw==20251023
 pytest>=8,<9
 piper-tts
 realtimetts[edge, gtts, piper]
