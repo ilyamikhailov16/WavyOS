@@ -17,5 +17,17 @@
         "base_url": "https://openrouter.ai/api/v1",
         "token": "",
         "model": "openai/gpt-oss-120b"
+    },
+    "script_runner": {
+        "base_dir": "C:/Users/User/Desktop/",
+        "timeout": 300,
+        "is_async": true,
+        "strict": false
+    },
+    "energy_saver": {
+        "enabled_lower_refresh_rate_hz_edit": 60
+    },
+    "screen_tool": {
+        "fps_recording_edit": 20
     }
 }

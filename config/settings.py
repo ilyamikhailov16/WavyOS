@@ -7,6 +7,19 @@ from pydantic import BaseModel, ConfigDict
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
+@lru_cache(maxsize=1)
+def _load_root_config() -> dict:
+    config_path = ROOT_DIR / "config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 class LLMProcessorSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -189,13 +202,26 @@ class ScreenToolSettings(BaseModel):
     paths: ScreenToolPathsSettings = ScreenToolPathsSettings()
     hotkeys: ScreenToolHotkeysSettings = ScreenToolHotkeysSettings()
     video_codec: str = "XVID"
-    fps: float = 20.0
+    fps: float = _load_root_config().get("script_runner", {}).get("timeout")
 
 
 class ScriptRunnerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    default_script_path: Path = ROOT_DIR / "scripts"
+    default_script_path: Path = Path(
+        _load_root_config().get("script_runner", {}).get("base_dir")
+        or (ROOT_DIR / "scripts")
+    )
+    timeout: float = (
+        _load_root_config().get("script_runner", {}).get("timeout")
+        or 300
+    )
+    is_async: bool = (
+        _load_root_config().get("script_runner", {}).get("is_async", True)
+    )
+    strict: bool = (
+        _load_root_config().get("script_runner", {}).get("strict", False)
+    )
 
 
 class EnergySaverPowerSettings(BaseModel):
@@ -203,7 +229,9 @@ class EnergySaverPowerSettings(BaseModel):
 
     enabled_threshold: int = 100
     disabled_threshold: int = 0
-    enabled_refresh_rate_hz: int = 60
+    enabled_lower_refresh_rate_hz: int = (
+        _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz", 60)
+    )
 
 
 class EnergySaverHotkeysSettings(BaseModel):
@@ -434,6 +462,13 @@ class STTSettings(BaseModel):
     spinner: bool = False
 
 
+class TTSSettings(BaseModel):
+    supported_engines: tuple[str, ...] = ("edge", "gtts", "piper")
+    piper_voice_path: str = str(ROOT_DIR / "tts/models/piper/ru_RU-irina-medium.onnx")
+    gtts_speed: float = 1.2
+    language: str = "ru"
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -450,6 +485,7 @@ class Settings(BaseModel):
     avatar: AvatarSettings = AvatarSettings()
     llm: LLMSettings = LLMSettings()
     stt: STTSettings = STTSettings()
+    tts: TTSSettings = TTSSettings()
 
 
 settings = Settings()
