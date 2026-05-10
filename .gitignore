@@ -48,6 +48,7 @@ captures/
 videos/
 screenshots/
 screenshot_*.png
+stt_debug/
 *.avi
 *.mp4
 *.mkv
