@@ -29,5 +29,19 @@
     },
     "screen_tool": {
         "fps_recording_edit": 20
+    },
+    "avatar": {
+        "enabled": true,
+        "window_title": "WavyOS Avatar",
+        "window_width": 360,
+        "window_height": 460,
+        "topmost": true,
+        "tick_interval_seconds": 0.15,
+        "transient_state_seconds": 1.5,
+        "error_state_seconds": 3.0,
+        "image_path": "src/images/mascot.png",
+        "assets_dir": "avatar/assets",
+        "manifest_path": "avatar/assets/avatar_manifest.json",
+        "animation_enabled": true
     }
 }

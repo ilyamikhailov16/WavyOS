@@ -48,9 +48,11 @@ captures/
 videos/
 screenshots/
 screenshot_*.png
+stt_debug/
 *.avi
 *.mp4
 *.mkv
+avatar/previews/
 
 # Local browser / automation state
 user-data/

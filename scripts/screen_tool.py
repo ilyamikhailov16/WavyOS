@@ -42,6 +42,7 @@ class ScreenToolSettings:
 
 
 settings = ScreenToolSettings()
+SCREEN_TOOL_SETTINGS = settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("screen_tool")
@@ -63,7 +64,7 @@ def timestamp() -> str:
 
 def take_screenshot() -> None:
     img = pyautogui.screenshot()
-    filename = SCREENSHOTS_DIR / f"{settings.paths.screenshot_prefix}_{timestamp()}.png"
+    filename = Path.cwd() / f"{settings.paths.screenshot_prefix}_{timestamp()}.png"
     img.save(filename)
     logger.info("Screenshot saved: %s", filename)
 
@@ -100,7 +101,7 @@ def start_recording() -> None:
         return
 
     recording = True
-    record_thread = threading.Thread(target=record_screen, daemon=True)
+    record_thread = threading.Thread(target=record_screen)
     record_thread.start()
 
 

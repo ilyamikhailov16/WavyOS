@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import queue
 import threading
+from typing import Callable
 from app_logging import get_logger
 from config import settings
 
@@ -137,7 +138,9 @@ class AvatarService:
                 last_snapshot = snapshot
 
 
-def build_avatar_service() -> AvatarService:
+def build_avatar_service(
+    on_avatar_window_closed: Callable[[], None] | None = None,
+) -> AvatarService:
     avatar_cfg = settings.avatar
     controller = AvatarController(
         idle_status_text=avatar_cfg.idle_status_text,
@@ -156,6 +159,10 @@ def build_avatar_service() -> AvatarService:
     if avatar_cfg.enabled:
         renderer = TkAvatarRenderer(
             image_path=avatar_cfg.image_path,
+            assets_dir=avatar_cfg.assets_dir,
+            manifest_path=avatar_cfg.manifest_path,
+            animation_enabled=avatar_cfg.animation_enabled,
+            on_window_closed=on_avatar_window_closed,
             window_title=avatar_cfg.window_title,
             window_size=(avatar_cfg.window_width, avatar_cfg.window_height),
             topmost=avatar_cfg.topmost,

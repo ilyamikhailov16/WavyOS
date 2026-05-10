@@ -124,6 +124,7 @@ def run_voice_processing(
         target=run_audio_recorder,
         args=(stop_event, queue, process_text_func),
         kwargs={**audio_recorder_params, "status_callback": status_callback},
+        daemon=True,
     )
     recorder_thread.start()
     return stop_event, recorder_thread

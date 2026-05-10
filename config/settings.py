@@ -1,8 +1,9 @@
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -18,6 +19,24 @@ def _load_root_config() -> dict:
         return data if isinstance(data, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _load_api_token() -> str:
+    for env_name in ("WAVYOS_API_TOKEN", "OPENROUTER_API_KEY"):
+        token = os.environ.get(env_name, "").strip()
+        if token:
+            return token
+
+    token_path = ROOT_DIR / "token.txt"
+    if token_path.exists():
+        try:
+            token = token_path.read_text(encoding="utf-8").strip()
+            if token:
+                return token
+        except OSError:
+            pass
+
+    return _load_root_config().get("api", {}).get("token", "")
 
 
 class LLMProcessorSettings(BaseModel):
@@ -233,6 +252,10 @@ class EnergySaverPowerSettings(BaseModel):
         _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz", 60)
     )
 
+    @property
+    def enabled_refresh_rate_hz(self) -> int:
+        return self.enabled_lower_refresh_rate_hz
+
 
 class EnergySaverHotkeysSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -418,7 +441,18 @@ class AvatarSettings(BaseModel):
     success_status_text: str = "Команда выполнена"
     unknown_status_text: str = "Не удалось распознать команду"
     error_status_text: str = "Произошла ошибка"
-    image_path: Path = ROOT_DIR / "src" / "images" / "mascot.png"
+    image_path: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
+        "image_path", "src/images/mascot.png"
+    )
+    assets_dir: Path = ROOT_DIR / _load_root_config().get(
+        "avatar", {}
+    ).get("assets_dir", "avatar/assets")
+    manifest_path: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
+        "manifest_path", "avatar/assets/avatar_manifest.json"
+    )
+    animation_enabled: bool = _load_root_config().get("avatar", {}).get(
+        "animation_enabled", True
+    )
 
 
 class LLMSettings(BaseModel):
@@ -430,14 +464,7 @@ class LLMSettings(BaseModel):
         .get("api", {})
         .get("base_url", "https://openrouter.ai/api/v1")
     )
-    token: str = (
-        _load_root_config()
-        .get("api", {})
-        .get(
-            "token",
-            "",
-        )
-    )
+    token: str = Field(default_factory=_load_api_token)
     model: str = _load_root_config().get("api", {}).get("model", "openrouter/free")
 
 

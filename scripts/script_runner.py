@@ -1,5 +1,6 @@
 import os
 import re
+import inspect
 from pathlib import Path
 import subprocess
 import sys
@@ -66,7 +67,11 @@ def _build_command(descriptor: ScriptDescriptor) -> list[str]:
 def _execute_command(cmd: list[str], descriptor: ScriptDescriptor) -> None:
     def _run_worker():
         try:
-            result = subprocess.run(cmd, check=True, timeout=descriptor.timeout)
+            run_kwargs = {"check": True}
+            run_parameters = inspect.signature(subprocess.run).parameters
+            if "timeout" in run_parameters:
+                run_kwargs["timeout"] = descriptor.timeout
+            result = subprocess.run(cmd, **run_kwargs)
             logger.info(f"[run_script] Script exited with code {result.returncode}.")
         except subprocess.CalledProcessError as exc:
             logger.error(f"[run_script] Script failed with code {exc.returncode}.")
@@ -116,6 +121,12 @@ def run_script(
         Keyword arguments forwarded as --key=value flags.
         Ignored for .bat scripts
     """
+    if args and isinstance(args[0], (str, os.PathLike)):
+        candidate_script_path = Path(args[0])
+        if (candidate_script_path / script_name).is_file():
+            script_path = candidate_script_path
+            args = args[1:]
+
     full_path = Path(script_path) / script_name
     descriptor = ScriptDescriptor(
         script_name,
