@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 class SettingsWindow(QWidget):
     """Main settings interface with logically separated tabs."""
-    shutdown_requested = Signal()
 
     def __init__(self, config_path: Path, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.config_path = config_path
         self.setWindowTitle("Application Settings")
         self.resize(580, 520)
@@ -37,7 +37,6 @@ class SettingsWindow(QWidget):
         main_layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         main_layout.addWidget(self.tabs)
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
         # === TAB 1: Script Runner ===
         sr_tab = QWidget()
@@ -197,9 +196,9 @@ class SettingsWindow(QWidget):
         self.reset_btn = QPushButton("🔄 Reset to Default")
         self.reset_btn.clicked.connect(self._on_reset_config)
 
-        self.save_btn = QPushButton("💾 Save & Restart")
+        self.save_btn = QPushButton("💾 Save")
         self.cancel_btn = QPushButton("❌ Cancel")
-        self.save_btn.clicked.connect(self._save_and_restart)
+        self.save_btn.clicked.connect(self._save_config)
         self.cancel_btn.clicked.connect(self.hide)
 
         btn_layout.addWidget(self.reset_btn)
@@ -301,7 +300,7 @@ class SettingsWindow(QWidget):
     # ------------------------------------------------------------------
     # Data Saving
     # ------------------------------------------------------------------
-    def _save_and_restart(self):
+    def _save_config(self):
         # Load current config to preserve untouched keys
         current = json.loads(self.config_path.read_text(encoding="utf-8"))
 
@@ -383,13 +382,13 @@ class SettingsWindow(QWidget):
             QMessageBox.critical(self, "Validation Error", f"Invalid configuration:\n{str(e)}")
             return
 
-        # 4. Write & Restart
+        # 4. Write
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(current, f, indent=2, ensure_ascii=False)
 
-        QMessageBox.information(self, "Success", "Settings saved. The application will restart.")
-        self.close()
-        self.shutdown_requested.emit()
+        QMessageBox.information(self, "Saved", "Settings saved successfully.\n"
+                                                         "Changes will take effect after restarting the application.")
+        self.hide()
 
     # ------------------------------------------------------------------
     # Event Handlers
@@ -430,3 +429,8 @@ class SettingsWindow(QWidget):
         self.custom_preset_combo.setEnabled(is_custom)
         if not is_custom:
             self.custom_path_edit.clear()
+
+    def closeEvent(self, event):
+        """Intercept window close (X button) → just hide, don't destroy or shutdown."""
+        event.ignore()
+        self.hide()
