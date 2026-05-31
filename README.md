@@ -21,20 +21,13 @@
 
 ---
 
-## 🏗️ Project Architecture & Thread Model
+## 🏗️ Project Architecture & Concurrency
 
-WavyOS utilizes a **multithreaded and asynchronous architecture within a single OS process**. This ensures that heavy AI workloads (such as STT/TTS and LLM processing) run concurrently in background worker threads without freezing or degrading the performance of the graphical user interface.
+WavyOS uses a **multithreaded and asynchronous architecture** within a single OS process to keep the graphical interface smooth during heavy AI workloads.
 
-### Module Distribution & Concurrency
-1. **Main Thread (UI, Tray & Settings):**
-   * Manages the **PySide6** Qt event loop to render the avatar overlay and settings dashboard.
-   * Handles user interactions, window rendering, and UI animations.
-2. **Background Worker Threads (`threading` & `asyncio`):**
-   * Host the resource-heavy voice processing stack (`RealtimeSTT` and speech synthesis).
-   * Asynchronously execute Windows API, PowerShell tasks, and custom automation scripts.
-
-### Inter-Thread Communication (ITC)
-The communication between the voice recognition core, the command processor, and the GUI layer is handled via thread-safe internal queues (**`queue.Queue`**). Detected voice triggers and commands are placed into the queue by background threads and consumed by the UI layer to update Wavy's emotional state and trigger corresponding Qt animations.
+* **Main Thread (UI & Tray):** Runs the **PySide6** event loop, rendering the avatar overlay, settings window, and animations.
+* **Worker Threads (`threading` & `asyncio`):** Run the voice processing stack (`RealtimeSTT` / TTS) and execute Windows API or PowerShell automation scripts in the background.
+* **Inter-Thread Communication:** Background threads push recognized commands into a thread-safe internal queue (**`queue.Queue`**), where the UI layer consumes them to instantly update the avatar's emotional state.
 
 ---
 
