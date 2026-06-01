@@ -28,14 +28,14 @@ from ipc.zmq_utils import (
 )
 
 from wavy.app_logging import get_logger
-from wavy.commands.commands_registry import build_command_pool, AppManager, DesktopManager
+from wavy.commands.commands_registry import get_command_pool, AppManager, DesktopManager
 from wavy.stt import run_voice_processing, LLMProcessor, CommandProcessor
 from wavy.prompts import build_command_prompt, KWARGS_PROMPT
 from wavy.config import settings
 from wavy.commands.commands_schema import (
     CommandEmptyArgs,
 )
-from commands.commands_registry import build_command_from_text
+from commands.commands_builder import build_command_from_text
 from ipc.protocol import SttStatusMessage, Command
 
 logger = get_logger("core")
@@ -311,7 +311,7 @@ def run_core_server(port: int = 5556):
     # Initialize components
     app_manager = AppManager()
     desktop_manager = DesktopManager()
-    command_pool = build_command_pool(app_manager, desktop_manager)
+    command_pool = get_command_pool(app_manager, desktop_manager)
     core = CoreApp(settings, command_pool)
     core.start()
 
