@@ -4,12 +4,10 @@ Tray process: pystray icon + ZMQ client to GUI.
 """
 
 import threading
-import logging
 import time
 import socket
 import ctypes
 import uuid
-from pathlib import Path
 
 import zmq
 from PIL import Image, ImageDraw, ImageFont
@@ -18,31 +16,9 @@ from pystray import MenuItem as Item
 import subprocess
 import sys
 
-# Add project root
-ROOT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT_DIR))
+from wavy.app_logging import get_logger
 
-
-# ===== Logging setup =====
-class ColoredFormatter(logging.Formatter):
-    COLORS = {
-        "INFO": "\033[92m",
-        "WARNING": "\033[93m",
-        "ERROR": "\033[91m",
-        "RESET": "\033[0m",
-    }
-
-    def format(self, record):
-        color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
-        return f"{color}{super().format(record)}{self.COLORS['RESET']}"
-
-
-logger = logging.getLogger("tray")
-handler = logging.StreamHandler()
-formatter = ColoredFormatter("[%(asctime)s] [%(levelname)s] %(message)s", "%H:%M:%S")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = get_logger("tray")
 
 
 class AppState:
