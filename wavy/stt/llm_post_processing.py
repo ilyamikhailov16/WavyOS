@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 from app_logging import get_logger
 from config import settings
-from commands.commands_schema import build_command, CommandNameOnly, CommandEmptyArgs, _COMMAND_TO_KWARGS_MODEL
+from commands.commands_schema import CommandNameOnly, CommandEmptyArgs
+from commands.commands_registry import build_command, _COMMAND_TO_KWARGS_MODEL
 from prompts import COMMAND_KWARGS_PROMPT_DICT
 
 logger = get_logger(__name__)

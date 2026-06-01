@@ -13,7 +13,6 @@ import asyncio
 import queue as q
 from pathlib import Path
 from typing import Optional
-import string
 
 # Add project root to path
 ROOT_DIR = Path(__file__).resolve().parent
@@ -34,60 +33,10 @@ from wavy.stt import run_voice_processing, LLMProcessor, CommandProcessor
 from wavy.prompts import build_command_prompt, KWARGS_PROMPT
 from wavy.config import settings
 from wavy.commands.commands_schema import (
-    CmdLaunchApp,
-    CmdOpenBrowser,
-    CmdCreateFile,
-    CmdCreateFolder,
-    CmdDelete,
-    CmdRunScript,
-    Command as Cmd,
     CommandEmptyArgs,
-    CommandApp,
-    CommandOpenBrowser,
-    CommandCreateFile,
-    CommandCreateFolder,
-    CommandDelete,
-    CommandRename,
-    CommandRunScript,
-    # === Commands without args ===
-    CmdEmptyRecycleBin,
-    CmdScreenshot,
-    CmdShutdown,
-    CmdToggleWifi,
-    CmdToggleNotifications,
-    CmdToggleAirplaneMode,
-    CmdToggleBluetooth,
-    CmdToggleMute,
-    CmdEnableEnergySaverMode,
-    CmdDisableEnergySaverMode,
-    CmdStartRecording,
-    CmdStopRecording,
-    CmdUnknown,
 )
-from commands.commands_keys import (
-    CMD_EMPTY_RECYCLE_BIN,
-    CMD_SCREENSHOT,
-    CMD_SHUTDOWN,
-    CMD_WIFI,
-    CMD_NOTIFICATIONS,
-    CMD_AIRPLANE,
-    CMD_BLUETOOTH,
-    CMD_SOUND,
-    CMD_ENERGY_SAVER_ON,
-    CMD_ENERGY_SAVER_OFF,
-    CMD_RECORD_ON,
-    CMD_RECORD_OFF,
-    CMD_LAUNCH_APP,
-    CMD_CLOSE_APP,
-    CMD_UNINSTALL_APP,
-    CMD_CREATE_FILE,
-    CMD_CREATE_FOLDER,
-    CMD_DELETE,
-    CMD_RENAME,
-    CMD_RUN_SCRIPT,
-    CMD_OPEN_SITE,
-)
-from ipc.protocol import SttStatusMessage
+from commands.commands_registry import build_command_from_text
+from ipc.protocol import SttStatusMessage, Command
 
 logger = get_logger("core")
 
@@ -133,40 +82,6 @@ class CoreApp:
 
     def _build_text_processor(self):
         """Build processor with keyword-based routing when LLM is disabled."""
-
-        # === Маппинг: ключевые слова → (класс, константа имени) ===
-        # Команды БЕЗ аргументов
-        NO_ARGS_COMMANDS = {
-            "очисти корзину": (CmdEmptyRecycleBin, CMD_EMPTY_RECYCLE_BIN),
-            "сделай скриншот": (CmdScreenshot, CMD_SCREENSHOT),
-            "выключи компьютер": (CmdShutdown, CMD_SHUTDOWN),
-            "wi-fi": (CmdToggleWifi, CMD_WIFI),
-            "уведомления": (CmdToggleNotifications, CMD_NOTIFICATIONS),
-            "режим полёта": (CmdToggleAirplaneMode, CMD_AIRPLANE),
-            "bluetooth": (CmdToggleBluetooth, CMD_BLUETOOTH),
-            "звук": (CmdToggleMute, CMD_SOUND),
-            "включи энергосбережение": (CmdEnableEnergySaverMode, CMD_ENERGY_SAVER_ON),
-            "выключи энергосбережение": (
-                CmdDisableEnergySaverMode,
-                CMD_ENERGY_SAVER_OFF,
-            ),
-            "включи запись экрана": (CmdStartRecording, CMD_RECORD_ON),
-            "выключи запись экрана": (CmdStopRecording, CMD_RECORD_OFF),
-        }
-
-        # Команды С аргументами (обрабатываются отдельно)
-        ARGS_COMMANDS_KEYWORDS = {
-            "открой приложение": CMD_LAUNCH_APP,
-            "закрой приложение": CMD_CLOSE_APP,
-            "удали приложение": CMD_UNINSTALL_APP,
-            "создай файл": CMD_CREATE_FILE,
-            "создай папку": CMD_CREATE_FOLDER,
-            "удали": CMD_DELETE,
-            "переименуй": CMD_RENAME,
-            "запусти скрипт": CMD_RUN_SCRIPT,
-            "открой сайт": CMD_OPEN_SITE,
-        }
-
         def _status_wrapper(status: str):
             msg = SttStatusMessage(msg_id=f"stt_{time.time()}", status=status)
             try:
@@ -193,78 +108,10 @@ class CoreApp:
 
         # Fallback: роутер по ключевым словам
         def _keyword_router(text: str):
-            clean = text.strip().rstrip(string.punctuation + ".,!?;:").lower()
-            if not clean:
-                return None
-
-            # 1. Проверяем команды БЕЗ аргументов (точное совпадение или вхождение)
-            for keyword, (cmd_cls, cmd_name) in NO_ARGS_COMMANDS.items():
-                if keyword in clean:
-                    _status_wrapper("transcription_started")
-                    wrapper = cmd_cls(command_name=cmd_name, kwargs=CommandEmptyArgs())
-                    return Cmd(command=wrapper)
-
-            # 2. Проверяем команды С аргументами
-            for keyword, cmd_name in ARGS_COMMANDS_KEYWORDS.items():
-                if keyword in clean:
-                    _status_wrapper("transcription_started")
-                    # Извлекаем аргумент: всё, что после ключевого слова
-                    arg_text = clean.replace(keyword, "").strip()
-
-                    if cmd_name == CMD_LAUNCH_APP:
-                        kwargs_obj = CommandApp(
-                            app_name=arg_text if arg_text else "unknown"
-                        )
-                        wrapper = CmdLaunchApp(command_name=cmd_name, kwargs=kwargs_obj)
-                    elif cmd_name == CMD_OPEN_SITE:
-                        kwargs_obj = CommandOpenBrowser(
-                            website_name=arg_text if arg_text else "example.com"
-                        )
-                        wrapper = CmdOpenBrowser(
-                            command_name=cmd_name, kwargs=kwargs_obj
-                        )
-                    elif cmd_name == CMD_CREATE_FILE:
-                        kwargs_obj = CommandCreateFile(
-                            filename=arg_text if arg_text else "untitled.txt"
-                        )
-                        wrapper = CmdCreateFile(
-                            command_name=cmd_name, kwargs=kwargs_obj
-                        )
-                    elif cmd_name == CMD_CREATE_FOLDER:
-                        kwargs_obj = CommandCreateFolder(
-                            name=arg_text if arg_text else "new_folder"
-                        )
-                        wrapper = CmdCreateFolder(
-                            command_name=cmd_name, kwargs=kwargs_obj
-                        )
-                    elif cmd_name in (CMD_DELETE, CMD_RENAME):
-                        kwargs_obj = CommandDelete(
-                            name=arg_text if arg_text else "unknown"
-                        )
-                        wrapper = CmdDelete(command_name=cmd_name, kwargs=kwargs_obj)
-                    elif cmd_name == CMD_RUN_SCRIPT:
-                        kwargs_obj = CommandRunScript(
-                            script_name=arg_text if arg_text else "script.py"
-                        )
-                        wrapper = CmdRunScript(command_name=cmd_name, kwargs=kwargs_obj)
-                    else:
-                        # Fallback для остальных: пустые аргументы
-                        wrapper = type(
-                            "FallbackCmd",
-                            (),
-                            {"command_name": cmd_name, "kwargs": CommandEmptyArgs()},
-                        )()
-                        # Это упрощение — в реальном коде нужно импортировать правильный класс
-                        # Но для большинства команд с аргументами выше уже есть обработка
-                        continue
-
-                    return Cmd(command=wrapper)
-
-            # 3. Если ничего не совпало — дефолт: запуск приложения
+            _status_wrapper("transcription_started")
+            cmd = build_command_from_text(text)
             _status_wrapper("listening_started")
-            kwargs_obj = CommandApp(app_name=clean)
-            wrapper_obj = CmdLaunchApp(command_name=CMD_LAUNCH_APP, kwargs=kwargs_obj)
-            return Cmd(command=wrapper_obj)
+            return cmd
 
         logger.warning("Core: LLM disabled. Using keyword-based router.")
         return _keyword_router

@@ -206,7 +206,7 @@ class CmdOpenBrowser(_CmdOpenBrowserArgs):
 
 
 class CmdUnknown(_CmdNoArgs):
-    command_name: Literal["#"]
+    command_name: Literal[CMD_UNKNOWN]
 
 
 AnyCommand = Union[
@@ -262,93 +262,10 @@ class CommandNameOnly(StrictBaseModel):
         CMD_RENAME,
         CMD_RUN_SCRIPT,
         CMD_OPEN_SITE,
-        "#",
+        CMD_UNKNOWN,
     ]
 
 
-_COMMAND_TO_WRAPPER: dict[str, type[StrictBaseModel]] = {
-    CMD_EMPTY_RECYCLE_BIN: CmdEmptyRecycleBin,
-    CMD_SCREENSHOT: CmdScreenshot,
-    CMD_SHUTDOWN: CmdShutdown,
-    CMD_WIFI: CmdToggleWifi,
-    CMD_NOTIFICATIONS: CmdToggleNotifications,
-    CMD_AIRPLANE: CmdToggleAirplaneMode,
-    CMD_BLUETOOTH: CmdToggleBluetooth,
-    CMD_SOUND: CmdToggleMute,
-    CMD_ENERGY_SAVER_ON: CmdEnableEnergySaverMode,
-    CMD_ENERGY_SAVER_OFF: CmdDisableEnergySaverMode,
-    CMD_RECORD_ON: CmdStartRecording,
-    CMD_RECORD_OFF: CmdStopRecording,
-    CMD_LAUNCH_APP: CmdLaunchApp,
-    CMD_CLOSE_APP: CmdCloseApp,
-    CMD_UNINSTALL_APP: CmdUninstallApp,
-    CMD_CREATE_FILE: CmdCreateFile,
-    CMD_CREATE_FOLDER: CmdCreateFolder,
-    CMD_DELETE: CmdDelete,
-    CMD_RENAME: CmdRename,
-    CMD_RUN_SCRIPT: CmdRunScript,
-    CMD_OPEN_SITE: CmdOpenBrowser,
-    "#": CmdUnknown,
-}
-
-
-_COMMAND_TO_KWARGS_MODEL: dict[str, type[StrictBaseModel]] = {
-    CMD_EMPTY_RECYCLE_BIN: CommandEmptyArgs,
-    CMD_SCREENSHOT: CommandEmptyArgs,
-    CMD_SHUTDOWN: CommandEmptyArgs,
-    CMD_WIFI: CommandEmptyArgs,
-    CMD_NOTIFICATIONS: CommandEmptyArgs,
-    CMD_AIRPLANE: CommandEmptyArgs,
-    CMD_BLUETOOTH: CommandEmptyArgs,
-    CMD_SOUND: CommandEmptyArgs,
-    CMD_ENERGY_SAVER_ON: CommandEmptyArgs,
-    CMD_ENERGY_SAVER_OFF: CommandEmptyArgs,
-    CMD_RECORD_ON: CommandEmptyArgs,
-    CMD_RECORD_OFF: CommandEmptyArgs,
-    CMD_LAUNCH_APP: CommandApp,
-    CMD_CLOSE_APP: CommandApp,
-    CMD_UNINSTALL_APP: CommandApp,
-    CMD_CREATE_FILE: CommandCreateFile,
-    CMD_CREATE_FOLDER: CommandCreateFolder,
-    CMD_DELETE: CommandDelete,
-    CMD_RENAME: CommandRename,
-    CMD_RUN_SCRIPT: CommandRunScript,
-    CMD_OPEN_SITE: CommandOpenBrowser,
-    "#": CommandEmptyArgs,
-}
-
-
-def get_command_kwargs_model(command_name: str) -> type[StrictBaseModel]:
-    """Return the kwargs model class for a given command name."""
-
-    return _COMMAND_TO_KWARGS_MODEL.get(command_name, CommandEmptyArgs)
-
-
-def build_command(command_name: str, kwargs: Any | None = None) -> Command:
-    """
-    Build the final `Command` object from:
-    - `command_name`
-    - optional `kwargs` 
-    """
-
-    wrapper_cls = _COMMAND_TO_WRAPPER.get(command_name, CmdUnknown)
-    # Keep unknown always as '#'
-    normalized_command_name = command_name if command_name in _COMMAND_TO_WRAPPER else "#"
-    kwargs_model = get_command_kwargs_model(normalized_command_name)
-
-    if kwargs is None:
-        kwargs_obj = kwargs_model()
-    elif isinstance(kwargs, BaseModel):
-        # Normalize to the expected kwargs model type.
-        kwargs_obj = kwargs_model.model_validate(kwargs.model_dump())
-    elif isinstance(kwargs, dict):
-        kwargs_obj = kwargs_model.model_validate(kwargs)
-    else:
-        # Let pydantic raise a clear validation error if type is unsupported.
-        kwargs_obj = kwargs_model.model_validate(kwargs)
-
-    wrapper_obj = wrapper_cls(
-        command_name=normalized_command_name,  # required by Literal discriminator
-        kwargs=kwargs_obj,
-    )
-    return Command(command=wrapper_obj)
+class CommandInfo(StrictBaseModel):
+    wrapper: type[StrictBaseModel]
+    kwargs_model: type[StrictBaseModel]
