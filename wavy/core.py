@@ -228,7 +228,6 @@ class CoreApp:
                     thread.join(timeout=timeout)
 
         self.tts.stop()
-        self._cleanup_child_processes()
         logger.info("Core stopped")
 
 
