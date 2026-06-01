@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 
 @lru_cache(maxsize=1)
 def _load_root_config() -> dict:
-    config_path = ROOT_DIR / "config.json"
+    config_path = ROOT_DIR.parent / "config.json"
     if not config_path.exists():
         return {}
     try:
@@ -235,10 +235,9 @@ class ScreenToolSettings(BaseModel):
 
 class ScriptRunnerSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
-
     default_script_path: Path = Path(
-        _load_root_config().get("script_runner", {}).get("base_dir")
-        or (ROOT_DIR / "scripts")
+        _load_root_config().get("script_runner", {}).get("default_script_path")
+        or (ROOT_DIR / "scriptsssssss")
     )
     timeout: float = _load_root_config().get("script_runner", {}).get("timeout") or 300
     is_async: bool = _load_root_config().get("script_runner", {}).get("is_async", True)
