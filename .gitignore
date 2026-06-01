@@ -26,6 +26,9 @@ pip-wheel-metadata/
 .idea/
 .vscode/
 
+# GigaIDE
+.gigaide/
+
 # Windows
 Thumbs.db
 Desktop.ini

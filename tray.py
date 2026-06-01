@@ -1,29 +1,37 @@
+#!/usr/bin/env python3
+"""
+Tray process: pystray icon + ZMQ client to GUI.
+"""
 import threading
 import logging
 import time
 import socket
 import ctypes
+import uuid
+from pathlib import Path
+
+import zmq
 from PIL import Image, ImageDraw, ImageFont
 import pystray
 from pystray import MenuItem as Item
 import subprocess
+import sys
 
+# Add project root
+ROOT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT_DIR))
 
+from ipc.protocol import Message, MessageType, Command
+from ipc.zmq_utils import create_context, connect_req_socket, send_message, recv_message
+
+# ===== Logging setup =====
 class ColoredFormatter(logging.Formatter):
-    COLORS = {
-        "INFO": "\033[92m",
-        "WARNING": "\033[93m",
-        "ERROR": "\033[91m",
-        "RESET": "\033[0m",
-    }
-
+    COLORS = {"INFO": "\033[92m", "WARNING": "\033[93m", "ERROR": "\033[91m", "RESET": "\033[0m"}
     def format(self, record):
         color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
-        message = super().format(record)
-        return f"{color}{message}{self.COLORS['RESET']}"
+        return f"{color}{super().format(record)}{self.COLORS['RESET']}"
 
-
-logger = logging.getLogger("tray_app")
+logger = logging.getLogger("tray")
 handler = logging.StreamHandler()
 formatter = ColoredFormatter("[%(asctime)s] [%(levelname)s] %(message)s", "%H:%M:%S")
 handler.setFormatter(formatter)
@@ -35,9 +43,9 @@ class AppState:
     def __init__(self):
         self.running_command = None
         self.icon = None
-        self.worker_thread = None  
-        self.lock_socket = None  
-        self.command_lock = threading.Lock()  
+        self.worker_thread = None
+        self.lock_socket = None
+        self.command_lock = threading.Lock()
 
 state = AppState()
 
@@ -49,18 +57,15 @@ def create_icon(color: str = "blue"):
     try:
         font = ImageFont.load_default()
         d.text((22, 15), "U", fill="black", font=font)
-    except Exception:
-        pass
+    except: pass
     return img
 
 
 def notify(title: str, message: str):
     try:
-        if state.icon is not None and getattr(state.icon, "visible", False):
+        if state.icon and getattr(state.icon, "visible", False):
             state.icon.notify(message, title)
-            logger.info(f"Уведомление: {title}")
-        else:
-            logger.info(f"[pre-tray] {title}: {message}")
+            logger.info(f"Notify: {title}")
     except Exception as e:
         logger.error(f"Notify failed: {e}")
 
@@ -78,22 +83,16 @@ def run_command(icon, name: str, command: str):
 
     def _worker():
         try:
-            result = subprocess.run(
-                command, shell=True, capture_output=True, text=True, timeout=60
-            )
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=60)
             if result.returncode == 0:
                 icon.icon = create_icon("green")
                 notify(name, "Выполнено успешно")
-                logger.info(f"{name} выполнена успешно")
             else:
                 icon.icon = create_icon("red")
-                error_text = result.stderr.strip() or "Неизвестная ошибка"
-                notify(f"{name} - ошибка", error_text)
-                logger.error(f"{name} ошибка: {error_text}")
+                notify(f"{name} - ошибка", result.stderr.strip() or "Неизвестная ошибка")
         except Exception as e:
             icon.icon = create_icon("red")
             notify(f"{name} - ошибка", str(e))
-            logger.error(f"{name} исключение: {e}")
         finally:
             time.sleep(2)
             icon.icon = create_icon("blue")
@@ -106,27 +105,42 @@ def run_command(icon, name: str, command: str):
     t.start()
 
 
+def _send_gui_command(command: str, port: int = 5555, timeout_ms: int = 2000) -> bool:
+    """Отправляет команду в GUI через ZMQ REQ/REP."""
+    ctx = zmq.Context()
+    ctx.setsockopt(zmq.LINGER, 0)
+    socket = ctx.socket(zmq.REQ)
+    socket.setsockopt(zmq.RCVTIMEO, timeout_ms)
+    socket.setsockopt(zmq.SNDTIMEO, timeout_ms)
+    try:
+        socket.connect(f"tcp://127.0.0.1:{port}")
+        msg_id = str(uuid.uuid4())[:8]
+        socket.send_json({"command": command, "msg_id": msg_id})
+        resp = socket.recv_json()
+        return resp.get("status") == "ok"
+    except Exception as e:
+        logger.warning(f"IPC to GUI failed: {e}")
+        return False
+    finally:
+        socket.close()
+        ctx.term()
+
+
+
 def exit_app(icon, item):
-    notify("Выход из трея", "Приложение успешно вышло из системного трея")
-    logger.info("Приложение закрывается...")
+    logger.info("Tray: Exit requested")
+    if not _send_gui_command("shutdown"):
+        logger.warning("Tray: GUI did not respond to SHUTDOWN — proceeding anyway")
 
+    notify("Выход", "Завершение работы...")
     worker = state.worker_thread
-    if worker is not None and worker.is_alive():
-        logger.info("Ожидание завершения текущей команды...")
-        worker.join(timeout=65)  
-        if worker.is_alive():
-            logger.warning("Worker не завершился вовремя, выходим всё равно")
-
-    if state.lock_socket is not None:
-        try:
-            state.lock_socket.close()
-            logger.info("Single-instance сокет закрыт")
-        except Exception as e:
-            logger.error(f"Ошибка при закрытии сокета: {e}")
-        finally:
-            state.lock_socket = None
-
+    if worker and worker.is_alive():
+        worker.join(timeout=5)
+    if state.lock_socket:
+        try: state.lock_socket.close()
+        except: pass
     icon.stop()
+    logger.info("Tray: Exited cleanly")
 
 
 def run_tray():
@@ -135,71 +149,42 @@ def run_tray():
         create_icon("blue"),
         "UniversalApp",
         menu=pystray.Menu(
-            Item(
-                "Команда 1",
-                lambda i, item: run_command(i, "Команда 1", "echo Команда 1"),
-            ),
-            Item(
-                "Команда 2",
-                lambda i, item: run_command(i, "Команда 2", "echo Команда 2"),
-            ),
-            Item(
-                "Тест ошибки",
-                lambda i, item: run_command(
-                    i, "Тест ошибки", "python -c \"raise RuntimeError('тест')\""
-                ),
-            ),
-            Item("Выход", exit_app),
+            Item("Команда 1", lambda i, item: run_command(i, "Команда 1", "echo Команда 1")),
+            Item("Команда 2", lambda i, item: run_command(i, "Команда 2", "echo Команда 2")),
+            Item("⚙ Настройки", lambda i, item: _send_gui_command("open_settings")),
+            Item("Выход", lambda i, item: (_send_gui_command("shutdown"), exit_app(i, item))),
         ),
     )
     state.icon = icon
 
     def on_ready(icon):
         icon.visible = True
-        notify(
-            "Вход в трей", "Приложение успешно вошло в системный трей и готово к работе"
-        )
-        logger.info("Трей полностью готов")
+        notify("Вход в трей", "Приложение готово к работе")
+        logger.info("Tray: Ready")
 
     icon.run(setup=on_ready)
 
 
-def fake_gui():
-    logger.info("Основной поток приложения работает")
-    while True:
-        time.sleep(1)
-
-
 if __name__ == "__main__":
-    logger.info("Запуск UniversalApp...")
+    logger.info("Tray: Starting...")
 
+    # Single-instance check via lock socket
     PORT = 65234
     try:
+        import socket, ctypes
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", PORT))
+        s.bind(("127.0.0.2", PORT))
         state.lock_socket = s
     except OSError:
-        logger.warning("Приложение уже запущено!")
+        logger.warning("Tray: Application already running!")
         try:
-            ctypes.windll.user32.MessageBoxW(
-                0,
-                "Приложение уже работает в трее.\nНовый экземпляр закрыт.",
-                "UniversalApp",
-                0x40,
-            )
-        except Exception:
-            pass
-        exit(1)
-
-    gui_thread = threading.Thread(target=fake_gui, daemon=True)
-    gui_thread.start()
+            ctypes.windll.user32.MessageBoxW(0, "Приложение уже работает в трее.", "UniversalApp", 0x40)
+        except: pass
+        sys.exit(1)
 
     try:
         run_tray()
     finally:
-        if state.lock_socket is not None:
-            try:
-                state.lock_socket.close()
-            except Exception:
-                pass
-            state.lock_socket = None
+        if state.lock_socket:
+            try: state.lock_socket.close()
+            except: pass

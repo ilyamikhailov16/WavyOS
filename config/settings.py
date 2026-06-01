@@ -2,6 +2,7 @@ import json
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -186,6 +187,11 @@ class BrowserRuntimeSettings(BaseModel):
     def playwright_channel_for(self, browser_name: str) -> str | None:
         return self.playwright_channels.get(browser_name)
 
+class CustomBrowserSettings(BaseModel):
+    model_config = ConfigDict(frozen=True)
+    path: str = ""
+    engine: Literal["chromium", "firefox"] = "chromium"
+    search_preset: str = ""  # "" = inherit from website name
 
 class BrowserSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -196,6 +202,7 @@ class BrowserSettings(BaseModel):
     process_names: ProcessNamesSettings = ProcessNamesSettings()
     registry: BrowserRegistrySettings = BrowserRegistrySettings()
     runtime: BrowserRuntimeSettings = BrowserRuntimeSettings()
+    custom: CustomBrowserSettings = CustomBrowserSettings()
 
 
 class ScreenToolPathsSettings(BaseModel):
@@ -221,7 +228,7 @@ class ScreenToolSettings(BaseModel):
     paths: ScreenToolPathsSettings = ScreenToolPathsSettings()
     hotkeys: ScreenToolHotkeysSettings = ScreenToolHotkeysSettings()
     video_codec: str = "XVID"
-    fps: float = _load_root_config().get("script_runner", {}).get("timeout")
+    fps: float = _load_root_config().get("screen_tool", {}).get("fps_recording_edit")
 
 
 class ScriptRunnerSettings(BaseModel):
@@ -249,7 +256,7 @@ class EnergySaverPowerSettings(BaseModel):
     enabled_threshold: int = 100
     disabled_threshold: int = 0
     enabled_lower_refresh_rate_hz: int = (
-        _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz", 60)
+        _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz_edit", 60)
     )
 
     @property
@@ -359,10 +366,18 @@ class AppManagerSettings(BaseModel):
         "crash",
         "squirrel",
     )
-    winget_timeout_s: int = 120
-    uninstall_timeout_s: int = 120
-    launch_wait_s: float = 1.0
-    subprocess_encoding: str = "utf-8"
+    winget_timeout_s: int = (
+        _load_root_config().get("app_manager", {}).get("winget_timeout_s", 120)
+    )
+    uninstall_timeout_s: int = (
+        _load_root_config().get("app_manager", {}).get("uninstall_timeout_s", 120)
+    )
+    launch_wait_s: float = (
+        _load_root_config().get("app_manager", {}).get("launch_wait_s", 1.0)
+    )
+    subprocess_encoding: str = (
+        _load_root_config().get("app_manager", {}).get("subprocess_encoding", "utf-8")
+    )
 
     # Custom launch: alias → (path_to_exe_with_%ENV%, arguments).
     # Used for applications that cannot be launched directly.
@@ -390,7 +405,6 @@ class AppManagerSettings(BaseModel):
             r"C:\Riot Games\Riot Client\RiotClientServices.exe",
         ],
     }
-
 
 class LoggingSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
