@@ -140,14 +140,6 @@ def run_tray():
         create_icon("blue"),
         "UniversalApp",
         menu=pystray.Menu(
-            Item(
-                "Команда 1",
-                lambda i, item: run_command(i, "Команда 1", "echo Команда 1"),
-            ),
-            Item(
-                "Команда 2",
-                lambda i, item: run_command(i, "Команда 2", "echo Команда 2"),
-            ),
             Item("⚙ Настройки", lambda i, item: _send_gui_command("open_settings")),
             Item(
                 "Выход",
@@ -159,7 +151,6 @@ def run_tray():
 
     def on_ready(icon):
         icon.visible = True
-        notify("Вход в трей", "Приложение готово к работе")
         logger.info("Tray: Ready")
 
     icon.run(setup=on_ready)
