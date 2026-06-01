@@ -187,11 +187,13 @@ class BrowserRuntimeSettings(BaseModel):
     def playwright_channel_for(self, browser_name: str) -> str | None:
         return self.playwright_channels.get(browser_name)
 
+
 class CustomBrowserSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
     path: str = ""
     engine: Literal["chromium", "firefox"] = "chromium"
     search_preset: str = ""  # "" = inherit from website name
+
 
 class BrowserSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -238,16 +240,9 @@ class ScriptRunnerSettings(BaseModel):
         _load_root_config().get("script_runner", {}).get("base_dir")
         or (ROOT_DIR / "scripts")
     )
-    timeout: float = (
-        _load_root_config().get("script_runner", {}).get("timeout")
-        or 300
-    )
-    is_async: bool = (
-        _load_root_config().get("script_runner", {}).get("is_async", True)
-    )
-    strict: bool = (
-        _load_root_config().get("script_runner", {}).get("strict", False)
-    )
+    timeout: float = _load_root_config().get("script_runner", {}).get("timeout") or 300
+    is_async: bool = _load_root_config().get("script_runner", {}).get("is_async", True)
+    strict: bool = _load_root_config().get("script_runner", {}).get("strict", False)
 
 
 class EnergySaverPowerSettings(BaseModel):
@@ -256,7 +251,9 @@ class EnergySaverPowerSettings(BaseModel):
     enabled_threshold: int = 100
     disabled_threshold: int = 0
     enabled_lower_refresh_rate_hz: int = (
-        _load_root_config().get("energy_saver", {}).get("enabled_lower_refresh_rate_hz_edit", 60)
+        _load_root_config()
+        .get("energy_saver", {})
+        .get("enabled_lower_refresh_rate_hz_edit", 60)
     )
 
     @property
@@ -406,6 +403,7 @@ class AppManagerSettings(BaseModel):
         ],
     }
 
+
 class LoggingSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -430,22 +428,20 @@ class AvatarSettings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     enabled: bool = _load_root_config().get("avatar", {}).get("enabled", True)
-    window_title: str = _load_root_config().get("avatar", {}).get(
-        "window_title", "WavyOS Avatar"
+    window_title: str = (
+        _load_root_config().get("avatar", {}).get("window_title", "WavyOS Avatar")
     )
     window_width: int = _load_root_config().get("avatar", {}).get("window_width", 360)
-    window_height: int = _load_root_config().get("avatar", {}).get(
-        "window_height", 460
-    )
+    window_height: int = _load_root_config().get("avatar", {}).get("window_height", 460)
     topmost: bool = _load_root_config().get("avatar", {}).get("topmost", True)
-    tick_interval_seconds: float = _load_root_config().get("avatar", {}).get(
-        "tick_interval_seconds", 0.15
+    tick_interval_seconds: float = (
+        _load_root_config().get("avatar", {}).get("tick_interval_seconds", 0.15)
     )
-    transient_state_seconds: float = _load_root_config().get("avatar", {}).get(
-        "transient_state_seconds", 1.5
+    transient_state_seconds: float = (
+        _load_root_config().get("avatar", {}).get("transient_state_seconds", 1.5)
     )
-    error_state_seconds: float = _load_root_config().get("avatar", {}).get(
-        "error_state_seconds", 3.0
+    error_state_seconds: float = (
+        _load_root_config().get("avatar", {}).get("error_state_seconds", 3.0)
     )
     idle_status_text: str = "Жду команд"
     listening_status_text: str = "Слушаю"
@@ -458,14 +454,14 @@ class AvatarSettings(BaseModel):
     image_path: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
         "image_path", "src/images/mascot.png"
     )
-    assets_dir: Path = ROOT_DIR / _load_root_config().get(
-        "avatar", {}
-    ).get("assets_dir", "avatar/assets")
+    assets_dir: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
+        "assets_dir", "avatar/assets"
+    )
     manifest_path: Path = ROOT_DIR / _load_root_config().get("avatar", {}).get(
         "manifest_path", "avatar/assets/avatar_manifest.json"
     )
-    animation_enabled: bool = _load_root_config().get("avatar", {}).get(
-        "animation_enabled", True
+    animation_enabled: bool = (
+        _load_root_config().get("avatar", {}).get("animation_enabled", True)
     )
 
 
@@ -491,14 +487,28 @@ class STTSettings(BaseModel):
         _load_root_config().get("stt", {}).get("compute_type", "float32")
     )
     device: str = _load_root_config().get("stt", {}).get("device", "cuda")
-    silero_sensitivity: float = _load_root_config().get("stt", {}).get("silero_sensitivity", 0.6)
-    webrtc_sensitivity: int = _load_root_config().get("stt", {}).get("webrtc_sensitivity", 3)
+    silero_sensitivity: float = (
+        _load_root_config().get("stt", {}).get("silero_sensitivity", 0.6)
+    )
+    webrtc_sensitivity: int = (
+        _load_root_config().get("stt", {}).get("webrtc_sensitivity", 3)
+    )
     silero_use_onnx: bool = True
-    silero_deactivity_detection: bool = _load_root_config().get("stt", {}).get("silero_deactivity_detection", False)
-    post_speech_silence_duration: float = _load_root_config().get("stt", {}).get("post_speech_silence_duration", 2.0)
-    min_gap_between_recordings: float = _load_root_config().get("stt", {}).get("min_gap_between_recordings", 1.0)
-    min_length_of_recording: float = _load_root_config().get("stt", {}).get("min_length_of_recording", 1.0)
-    pre_recording_buffer_duration: float = _load_root_config().get("stt", {}).get("pre_recording_buffer_duration", 0.2)
+    silero_deactivity_detection: bool = (
+        _load_root_config().get("stt", {}).get("silero_deactivity_detection", False)
+    )
+    post_speech_silence_duration: float = (
+        _load_root_config().get("stt", {}).get("post_speech_silence_duration", 2.0)
+    )
+    min_gap_between_recordings: float = (
+        _load_root_config().get("stt", {}).get("min_gap_between_recordings", 1.0)
+    )
+    min_length_of_recording: float = (
+        _load_root_config().get("stt", {}).get("min_length_of_recording", 1.0)
+    )
+    pre_recording_buffer_duration: float = (
+        _load_root_config().get("stt", {}).get("pre_recording_buffer_duration", 0.2)
+    )
     no_log_file: bool = True
     spinner: bool = False
 

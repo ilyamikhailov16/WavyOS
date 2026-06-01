@@ -2,7 +2,6 @@
 import subprocess
 import sys
 import time
-import signal
 import logging
 import threading as th
 from pathlib import Path
@@ -21,6 +20,7 @@ PROCESSES = [
 
 active_procs = []
 
+
 def start_process(name: str, script: str, delay: float) -> subprocess.Popen:
     logger.info(f"Starting {name}...")
     proc = subprocess.Popen(
@@ -29,16 +29,18 @@ def start_process(name: str, script: str, delay: float) -> subprocess.Popen:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
     )
     time.sleep(delay)
     logger.info(f"{name} started (PID {proc.pid})")
     return proc
 
+
 def forward_logs(proc: subprocess.Popen, prefix: str):
     for line in proc.stdout:
         if line.strip():
             logger.info(f"[{prefix}] {line.strip()}")
+
 
 def cleanup_all():
     logger.info("Terminating all processes...")
@@ -46,8 +48,11 @@ def cleanup_all():
         if proc.poll() is None:
             proc.terminate()
     for name, proc in active_procs:
-        try: proc.wait(timeout=3)
-        except: proc.kill()
+        try:
+            proc.wait(timeout=3)
+        except:
+            proc.kill()
+
 
 def main():
     logger.info("=== UniversalApp Launcher ===")
@@ -73,6 +78,7 @@ def main():
         logger.error(f"Launcher error: {e}", exc_info=True)
         cleanup_all()
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

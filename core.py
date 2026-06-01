@@ -4,8 +4,8 @@ Core process: STT, TTS, AppManager, command execution.
 Communicates with GUI via ZMQ REP on port 5556.
 NO Qt/PySide6 imports allowed here.
 """
+
 import sys
-import logging
 import json
 import threading as th
 import time
@@ -14,16 +14,26 @@ import queue as q
 from pathlib import Path
 from typing import Optional
 from commands.commands_schema import (
-    CmdLaunchApp, CmdOpenBrowser, CmdCreateFile, CmdCreateFolder, CmdDelete, CmdRunScript
+    CmdLaunchApp,
+    CmdOpenBrowser,
+    CmdCreateFile,
+    CmdCreateFolder,
+    CmdDelete,
+    CmdRunScript,
 )
 
 # Add project root to path
 ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
 
-import zmq
 from ipc.protocol import Message, MessageType, Command, SttStatusMessage
-from ipc.zmq_utils import create_context, bind_rep_socket, send_message, recv_message, poll_socket
+from ipc.zmq_utils import (
+    create_context,
+    bind_rep_socket,
+    send_message,
+    recv_message,
+    poll_socket,
+)
 
 from app_logging import get_logger
 from commands.commands_registry import build_command_pool, AppManager, DesktopManager
@@ -44,20 +54,42 @@ from commands.commands_schema import (
     CommandRename,
     CommandRunScript,
     # === Commands without args ===
-    CmdEmptyRecycleBin, CmdScreenshot, CmdShutdown,
-    CmdToggleWifi, CmdToggleNotifications, CmdToggleAirplaneMode,
-    CmdToggleBluetooth, CmdToggleMute,
-    CmdEnableEnergySaverMode, CmdDisableEnergySaverMode,
-    CmdStartRecording, CmdStopRecording, CmdUnknown,
+    CmdEmptyRecycleBin,
+    CmdScreenshot,
+    CmdShutdown,
+    CmdToggleWifi,
+    CmdToggleNotifications,
+    CmdToggleAirplaneMode,
+    CmdToggleBluetooth,
+    CmdToggleMute,
+    CmdEnableEnergySaverMode,
+    CmdDisableEnergySaverMode,
+    CmdStartRecording,
+    CmdStopRecording,
+    CmdUnknown,
 )
 from commands.commands_keys import (
-    CMD_EMPTY_RECYCLE_BIN, CMD_SCREENSHOT, CMD_SHUTDOWN,
-    CMD_WIFI, CMD_NOTIFICATIONS, CMD_AIRPLANE, CMD_BLUETOOTH, CMD_SOUND,
-    CMD_ENERGY_SAVER_ON, CMD_ENERGY_SAVER_OFF,
-    CMD_RECORD_ON, CMD_RECORD_OFF,
-    CMD_LAUNCH_APP, CMD_CLOSE_APP, CMD_UNINSTALL_APP,
-    CMD_CREATE_FILE, CMD_CREATE_FOLDER, CMD_DELETE, CMD_RENAME,
-    CMD_RUN_SCRIPT, CMD_OPEN_SITE,
+    CMD_EMPTY_RECYCLE_BIN,
+    CMD_SCREENSHOT,
+    CMD_SHUTDOWN,
+    CMD_WIFI,
+    CMD_NOTIFICATIONS,
+    CMD_AIRPLANE,
+    CMD_BLUETOOTH,
+    CMD_SOUND,
+    CMD_ENERGY_SAVER_ON,
+    CMD_ENERGY_SAVER_OFF,
+    CMD_RECORD_ON,
+    CMD_RECORD_OFF,
+    CMD_LAUNCH_APP,
+    CMD_CLOSE_APP,
+    CMD_UNINSTALL_APP,
+    CMD_CREATE_FILE,
+    CMD_CREATE_FOLDER,
+    CMD_DELETE,
+    CMD_RENAME,
+    CMD_RUN_SCRIPT,
+    CMD_OPEN_SITE,
 )
 from ipc.protocol import SttStatusMessage
 
@@ -81,12 +113,14 @@ class CoreApp:
 
     def _init_tts(self):
         from tts import TTS, CMD2VOICE
+
         self.tts = TTS()
         self._CMD2VOICE = CMD2VOICE
 
     def _init_stt_pub(self):
         """Initialize ZMQ PUB socket for broadcasting STT status to GUI."""
         import zmq
+
         self.stt_pub_ctx = zmq.Context()
         self.stt_pub_ctx.setsockopt(zmq.LINGER, 0)
         self.stt_pub = self.stt_pub_ctx.socket(zmq.PUB)
@@ -116,7 +150,10 @@ class CoreApp:
             "bluetooth": (CmdToggleBluetooth, CMD_BLUETOOTH),
             "звук": (CmdToggleMute, CMD_SOUND),
             "включи энергосбережение": (CmdEnableEnergySaverMode, CMD_ENERGY_SAVER_ON),
-            "выключи энергосбережение": (CmdDisableEnergySaverMode, CMD_ENERGY_SAVER_OFF),
+            "выключи энергосбережение": (
+                CmdDisableEnergySaverMode,
+                CMD_ENERGY_SAVER_OFF,
+            ),
             "включи запись экрана": (CmdStartRecording, CMD_RECORD_ON),
             "выключи запись экрана": (CmdStopRecording, CMD_RECORD_OFF),
         }
@@ -160,7 +197,7 @@ class CoreApp:
 
         # Fallback: роутер по ключевым словам
         def _keyword_router(text: str):
-            clean = text.strip().rstrip(string.punctuation + '.,!?;:').lower()
+            clean = text.strip().rstrip(string.punctuation + ".,!?;:").lower()
             if not clean:
                 return None
 
@@ -179,29 +216,48 @@ class CoreApp:
                     arg_text = clean.replace(keyword, "").strip()
 
                     if cmd_name == CMD_LAUNCH_APP:
-                        kwargs_obj = CommandApp(app_name=arg_text if arg_text else "unknown")
+                        kwargs_obj = CommandApp(
+                            app_name=arg_text if arg_text else "unknown"
+                        )
                         wrapper = CmdLaunchApp(command_name=cmd_name, kwargs=kwargs_obj)
                     elif cmd_name == CMD_OPEN_SITE:
-                        kwargs_obj = CommandOpenBrowser(website_name=arg_text if arg_text else "example.com")
-                        wrapper = CmdOpenBrowser(command_name=cmd_name, kwargs=kwargs_obj)
+                        kwargs_obj = CommandOpenBrowser(
+                            website_name=arg_text if arg_text else "example.com"
+                        )
+                        wrapper = CmdOpenBrowser(
+                            command_name=cmd_name, kwargs=kwargs_obj
+                        )
                     elif cmd_name == CMD_CREATE_FILE:
-                        kwargs_obj = CommandCreateFile(filename=arg_text if arg_text else "untitled.txt")
-                        wrapper = CmdCreateFile(command_name=cmd_name, kwargs=kwargs_obj)
+                        kwargs_obj = CommandCreateFile(
+                            filename=arg_text if arg_text else "untitled.txt"
+                        )
+                        wrapper = CmdCreateFile(
+                            command_name=cmd_name, kwargs=kwargs_obj
+                        )
                     elif cmd_name == CMD_CREATE_FOLDER:
-                        kwargs_obj = CommandCreateFolder(name=arg_text if arg_text else "new_folder")
-                        wrapper = CmdCreateFolder(command_name=cmd_name, kwargs=kwargs_obj)
+                        kwargs_obj = CommandCreateFolder(
+                            name=arg_text if arg_text else "new_folder"
+                        )
+                        wrapper = CmdCreateFolder(
+                            command_name=cmd_name, kwargs=kwargs_obj
+                        )
                     elif cmd_name in (CMD_DELETE, CMD_RENAME):
-                        kwargs_obj = CommandDelete(name=arg_text if arg_text else "unknown")
+                        kwargs_obj = CommandDelete(
+                            name=arg_text if arg_text else "unknown"
+                        )
                         wrapper = CmdDelete(command_name=cmd_name, kwargs=kwargs_obj)
                     elif cmd_name == CMD_RUN_SCRIPT:
-                        kwargs_obj = CommandRunScript(script_name=arg_text if arg_text else "script.py")
+                        kwargs_obj = CommandRunScript(
+                            script_name=arg_text if arg_text else "script.py"
+                        )
                         wrapper = CmdRunScript(command_name=cmd_name, kwargs=kwargs_obj)
                     else:
                         # Fallback для остальных: пустые аргументы
-                        wrapper = type('FallbackCmd', (), {
-                            'command_name': cmd_name,
-                            'kwargs': CommandEmptyArgs()
-                        })()
+                        wrapper = type(
+                            "FallbackCmd",
+                            (),
+                            {"command_name": cmd_name, "kwargs": CommandEmptyArgs()},
+                        )()
                         # Это упрощение — в реальном коде нужно импортировать правильный класс
                         # Но для большинства команд с аргументами выше уже есть обработка
                         continue
@@ -236,8 +292,11 @@ class CoreApp:
                 logger.info(f"Recognised command: {cmd_data}")
 
                 cmd_name = cmd_data.command_name
-                kwargs = ({} if isinstance(cmd_data.kwargs, CommandEmptyArgs)
-                          else cmd_data.kwargs.model_dump())
+                kwargs = (
+                    {}
+                    if isinstance(cmd_data.kwargs, CommandEmptyArgs)
+                    else cmd_data.kwargs.model_dump()
+                )
 
                 if cmd_name == "#":
                     continue
@@ -269,7 +328,8 @@ class CoreApp:
                         try:
                             reset_msg = json.dumps({"status": "listening_started"})
                             self.stt_pub.send_string(reset_msg)
-                        except: pass
+                        except:
+                            pass
         finally:
             loop.close()
 
@@ -317,8 +377,10 @@ class CoreApp:
             logger.info("Core.stop(): signaling shutdown...")
             self.stop_event.set()
 
-            for name, thread in [("recorder", self.recorder_thread),
-                                 ("loop", self.loop_thread)]:
+            for name, thread in [
+                ("recorder", self.recorder_thread),
+                ("loop", self.loop_thread),
+            ]:
                 if thread and thread.is_alive():
                     thread.join(timeout=timeout)
 
@@ -327,7 +389,9 @@ class CoreApp:
         logger.info("Core stopped")
 
 
-def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) -> Message:
+def handle_core_request(
+    msg: Message, core: CoreApp, app_manager: AppManager
+) -> Message:
     """Process incoming command from GUI."""
     try:
         if msg.command == Command.LAUNCH_APP:
@@ -337,7 +401,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
                 msg_id=msg.msg_id,
                 msg_type=MessageType.RESPONSE,
                 command=msg.command,
-                payload={"status": result.status.value, "message": result.message}
+                payload={"status": result.status.value, "message": result.message},
             )
 
         elif msg.command == Command.CLOSE_APP:
@@ -347,7 +411,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
                 msg_id=msg.msg_id,
                 msg_type=MessageType.RESPONSE,
                 command=msg.command,
-                payload={"status": result.status.value, "message": result.message}
+                payload={"status": result.status.value, "message": result.message},
             )
 
         elif msg.command == Command.UNINSTALL_APP:
@@ -357,7 +421,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
                 msg_id=msg.msg_id,
                 msg_type=MessageType.RESPONSE,
                 command=msg.command,
-                payload={"status": result.status.value, "message": result.message}
+                payload={"status": result.status.value, "message": result.message},
             )
 
         elif msg.command == Command.LIST_RUNNING_APPS:
@@ -366,7 +430,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
                 msg_id=msg.msg_id,
                 msg_type=MessageType.RESPONSE,
                 command=msg.command,
-                payload={"processes": result.data.get("processes", [])}
+                payload={"processes": result.data.get("processes", [])},
             )
 
         elif msg.command == Command.IS_APP_RUNNING:
@@ -376,7 +440,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
                 msg_id=msg.msg_id,
                 msg_type=MessageType.RESPONSE,
                 command=msg.command,
-                payload={"running": result.data.get("running", False)}
+                payload={"running": result.data.get("running", False)},
             )
 
         else:
@@ -384,7 +448,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
                 msg_id=msg.msg_id,
                 msg_type=MessageType.ERROR,
                 command=msg.command,
-                error=f"Unknown command: {msg.command}"
+                error=f"Unknown command: {msg.command}",
             )
 
     except Exception as e:
@@ -393,7 +457,7 @@ def handle_core_request(msg: Message, core: CoreApp, app_manager: AppManager) ->
             msg_id=msg.msg_id,
             msg_type=MessageType.ERROR,
             command=msg.command,
-            error=str(e)
+            error=str(e),
         )
 
 
@@ -426,7 +490,8 @@ def run_core_server(port: int = 5556):
         logger.error(f"Core: Fatal error: {e}", exc_info=True)
     finally:
         # 1. Останавливаем потоки
-        if core.stop_event: core.stop_event.set()
+        if core.stop_event:
+            core.stop_event.set()
         if core.recorder_thread and core.recorder_thread.is_alive():
             core.recorder_thread.join(timeout=2.0)
         if core.loop_thread and core.loop_thread.is_alive():
@@ -438,16 +503,22 @@ def run_core_server(port: int = 5556):
         # 3. Убиваем "зомби"-детей (RealtimeSTT/faster_whisper часто оставляют их)
         try:
             import psutil, os
+
             parent = psutil.Process(os.getpid())
             for child in parent.children(recursive=True):
-                try: child.kill()
-                except: pass
-        except: pass
+                try:
+                    child.kill()
+                except:
+                    pass
+        except:
+            pass
 
         # 4. Закрываем сеть
         logger.info("Core: Closing ZMQ sockets...")
-        if socket: socket.close(linger=0)
-        if ctx: ctx.term()
+        if socket:
+            socket.close(linger=0)
+        if ctx:
+            ctx.term()
         logger.info("Core: Terminated cleanly")
 
 

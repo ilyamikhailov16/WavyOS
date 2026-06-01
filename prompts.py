@@ -1,5 +1,6 @@
 from commands.commands_keys import *
 
+
 def build_command_prompt(command_pool: dict[str, callable]) -> str:
     commands = ", ".join(f"'{k}'" for k in command_pool)
 
@@ -20,7 +21,8 @@ KWARGS_PROMPT = (
     "Names(commands and arguments) should not contain extra characters unless the user has specified them. "
     "Use only single quotation marks(that is '') to indicate that a value is missing. "
     "Don't wrap them in other symbols. "
-    "Totally do not use any other quotation marks(ex. "" or ``) to indicate that a value is missing. "
+    "Totally do not use any other quotation marks(ex. "
+    " or ``) to indicate that a value is missing. "
     "Follow the per-command extraction rules provided in the user message."
 )
 
@@ -71,7 +73,10 @@ COMMAND_KWARGS_PROMPT_DICT = {
         "    - config/data -> '.json'\n"
         "    - plain text/notes/unknown -> '.txt'\n\n"
         "Rules for folder field (if present):\n"
-        "- If the user did NOT specify any folder, leave folder field as an empty string(only '' without "". '' is correct, "''" is very bad).\n"
+        "- If the user did NOT specify any folder, leave folder field as an empty string(only '' without "
+        ". '' is correct, "
+        ""
+        " is very bad).\n"
         "- Lowercase only.\n"
         "- Use ONLY '_' as a separator.\n"
         "- Do NOT include spaces.\n"
@@ -98,7 +103,10 @@ COMMAND_KWARGS_PROMPT_DICT = {
         "- Use Russian language for the name, do not mix English and Russian.\n"
         "- If it is a file, include the extension (infer it if needed using the same extension rules as create-file).\n\n"
         "Rules for folder field (if present):\n"
-        "- If the user did NOT specify any folder, leave folder field as an empty string(only '' without "". '' is correct, "''" is very bad).\n"
+        "- If the user did NOT specify any folder, leave folder field as an empty string(only '' without "
+        ". '' is correct, "
+        ""
+        " is very bad).\n"
         "- Lowercase only.\n"
         "- Use ONLY '_' as a separator.\n"
         "- Do NOT include spaces.\n"
@@ -116,12 +124,15 @@ COMMAND_KWARGS_PROMPT_DICT = {
         "  - Preserve the old extension unless the user explicitly requests changing it.\n"
         "  - Ensure the new file name has exactly one extension, lowercase.\n\n"
         "Rules for folder field (if present):\n"
-        "- If the user did NOT specify any folder, leave folder field as an empty string(only '' without "". '' is correct, "''" is very bad).\n"
+        "- If the user did NOT specify any folder, leave folder field as an empty string(only '' without "
+        ". '' is correct, "
+        ""
+        " is very bad).\n"
         "- Lowercase only.\n"
         "- Use ONLY '_' as a separator.\n"
         "- Do NOT include spaces.\n"
         "- Use Russian language for the name, do not mix English and Russian."
-    ), 
+    ),
     CMD_RUN_SCRIPT: (
         "Extract kwargs for running a Python script.\n"
         "Return strictly JSON matching the schema.\n\n"

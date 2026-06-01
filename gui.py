@@ -2,10 +2,9 @@
 """
 GUI process: PySide6 window + ZMQ clients for Core/Tray + Avatar UI.
 """
+
 import sys
-import logging
 import threading as th
-import time
 import json
 from pathlib import Path
 
@@ -16,7 +15,6 @@ import zmq
 from PySide6.QtCore import QMetaObject, Qt, QTimer, Signal, QObject
 from PySide6.QtWidgets import QApplication
 
-from ipc.protocol import Message, MessageType, Command, SttStatusMessage
 from app_logging import get_logger
 from src.gui.settings_window import SettingsWindow
 from src.gui.utils import setup_force_exit_fallback
@@ -24,8 +22,10 @@ from avatar.src.avatar_service import AvatarService, build_avatar_service
 
 logger = get_logger("gui")
 
+
 class SttStatusListener(QObject):
     """ZMQ SUB client: receives status strings and forwards to avatar_service."""
+
     status_received = Signal(str)
 
     def __init__(self, port: int = 5557, avatar_svc=None, parent=None):
@@ -76,12 +76,15 @@ class SttStatusListener(QObject):
 
     def cleanup(self):
         self.timer.stop()
-        if self.socket: self.socket.close()
-        if self.ctx: self.ctx.term()
+        if self.socket:
+            self.socket.close()
+        if self.ctx:
+            self.ctx.term()
 
 
 class TrayIPC(QObject):
     """ZMQ REP server for tray commands (port 5555). Strict recv→send cycle."""
+
     open_settings_requested = Signal()
     shutdown_requested = Signal()
 
@@ -123,16 +126,26 @@ class TrayIPC(QObject):
                 logger.error(f"IPC receive/send error: {e}")
                 # Fallback ACK чтобы сокет не завис
                 try:
-                    self.socket.send_json({"ack": msg_data.get("msg_id"), "status": "error"})
-                except: pass
+                    self.socket.send_json(
+                        {"ack": msg_data.get("msg_id"), "status": "error"}
+                    )
+                except:
+                    pass
 
     def cleanup(self):
         self.timer.stop()
-        if self.socket: self.socket.close()
-        if self.ctx: self.ctx.term()
+        if self.socket:
+            self.socket.close()
+        if self.ctx:
+            self.ctx.term()
 
 
-def _do_shutdown(tray_ipc: TrayIPC, avatar_service: AvatarService, settings_win: SettingsWindow, qt_app: QApplication):
+def _do_shutdown(
+    tray_ipc: TrayIPC,
+    avatar_service: AvatarService,
+    settings_win: SettingsWindow,
+    qt_app: QApplication,
+):
     """Graceful shutdown handler."""
     logger.info("GUI: Graceful shutdown initiated")
     settings_win.hide()
@@ -147,6 +160,7 @@ def _do_shutdown(tray_ipc: TrayIPC, avatar_service: AvatarService, settings_win:
         finally:
             QMetaObject.invokeMethod(qt_app, "quit", Qt.ConnectionType.QueuedConnection)
             setup_force_exit_fallback(delay_seconds=10.0)
+
     th.Thread(target=_shutdown_worker, daemon=True).start()
 
 
@@ -155,13 +169,15 @@ if __name__ == "__main__":
 
     # 1. Создаём avatar_service ПЕРВЫМ
     avatar_service = build_avatar_service(
-        on_avatar_window_closed=lambda: _do_shutdown(tray_ipc, avatar_service, settings_win, qt_app)
+        on_avatar_window_closed=lambda: _do_shutdown(
+            tray_ipc, avatar_service, settings_win, qt_app
+        )
     )
     avatar_service.start()
     logger.info("GUI: Avatar service started")
 
     # 2. Создаём слушатель статусов
-    stt_listener = SttStatusListener(port=5557, avatar_svc = avatar_service)
+    stt_listener = SttStatusListener(port=5557, avatar_svc=avatar_service)
 
     # 3. Подключаем сигнал к методу аватара — строка передаётся как есть!
     stt_listener.status_received.connect(avatar_service.handle_stt_status)
