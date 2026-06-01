@@ -13,14 +13,7 @@ import asyncio
 import queue as q
 from pathlib import Path
 from typing import Optional
-from commands.commands_schema import (
-    CmdLaunchApp,
-    CmdOpenBrowser,
-    CmdCreateFile,
-    CmdCreateFolder,
-    CmdDelete,
-    CmdRunScript,
-)
+import string
 
 # Add project root to path
 ROOT_DIR = Path(__file__).resolve().parent
@@ -35,15 +28,18 @@ from ipc.zmq_utils import (
     poll_socket,
 )
 
-from app_logging import get_logger
-from commands.commands_registry import build_command_pool, AppManager, DesktopManager
-from stt import run_voice_processing, LLMProcessor, CommandProcessor
-from prompts import build_command_prompt, KWARGS_PROMPT
-from config import settings
-
-
-import string
-from commands.commands_schema import (
+from wavy.app_logging import get_logger
+from wavy.commands.commands_registry import build_command_pool, AppManager, DesktopManager
+from wavy.stt import run_voice_processing, LLMProcessor, CommandProcessor
+from wavy.prompts import build_command_prompt, KWARGS_PROMPT
+from wavy.config import settings
+from wavy.commands.commands_schema import (
+    CmdLaunchApp,
+    CmdOpenBrowser,
+    CmdCreateFile,
+    CmdCreateFolder,
+    CmdDelete,
+    CmdRunScript,
     Command as Cmd,
     CommandEmptyArgs,
     CommandApp,

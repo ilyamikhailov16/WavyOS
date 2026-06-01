@@ -1,4 +1,4 @@
-from commands.commands_keys import *
+from wavy.commands.commands_keys import *
 
 
 def build_command_prompt(command_pool: dict[str, callable]) -> str:

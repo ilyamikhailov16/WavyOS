@@ -66,4 +66,4 @@ downloads/
 token.txt
 
 # Models
-tts/models/*
+wavy/tts/models/*

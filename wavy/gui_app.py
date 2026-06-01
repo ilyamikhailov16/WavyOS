@@ -15,10 +15,10 @@ import zmq
 from PySide6.QtCore import QMetaObject, Qt, QTimer, Signal, QObject
 from PySide6.QtWidgets import QApplication
 
-from app_logging import get_logger
-from src.gui.settings_window import SettingsWindow
-from src.gui.utils import setup_force_exit_fallback
-from avatar.src.avatar_service import AvatarService, build_avatar_service
+from wavy.app_logging import get_logger
+from wavy.gui.settings_window import SettingsWindow
+from wavy.gui.utils import setup_force_exit_fallback
+from wavy.avatar.src.avatar_service import AvatarService, build_avatar_service
 
 logger = get_logger("gui")
 

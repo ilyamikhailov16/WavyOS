@@ -13,9 +13,9 @@ ROOT_DIR = Path(__file__).resolve().parent
 PYTHON = sys.executable
 
 PROCESSES = [
-    ("Core", "core.py", 8.0),
-    ("GUI", "gui.py", 1.0),
-    ("Tray", "tray.py", 0.5),
+    ("Core", "wavy.core", 8.0),
+    ("GUI", "wavy.gui_app", 1.0),
+    ("Tray", "wavy.tray", 0.5),
 ]
 
 active_procs = []
@@ -24,7 +24,7 @@ active_procs = []
 def start_process(name: str, script: str, delay: float) -> subprocess.Popen:
     logger.info(f"Starting {name}...")
     proc = subprocess.Popen(
-        [PYTHON, str(ROOT_DIR / script)],
+        [PYTHON, "-m", script.replace("/", ".").removesuffix(".py")],
         cwd=ROOT_DIR,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

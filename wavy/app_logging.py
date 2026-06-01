@@ -1,5 +1,5 @@
 import logging
-from config import settings
+from wavy.config import settings
 
 _CONFIGURED = False
 
