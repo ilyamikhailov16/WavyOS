@@ -2,6 +2,7 @@
 Shared message protocol for IPC between core/gui/tray.
 All messages are JSON-serializable dataclasses.
 """
+
 import json
 import time
 from dataclasses import dataclass, field, asdict
@@ -12,6 +13,7 @@ from enum import Enum, auto
 @dataclass
 class SttStatusMessage:
     """Broadcast message: just a string status + metadata."""
+
     msg_id: str
     status: str  # ← Строка, которую понимает avatar_service.handle_stt_status
     timestamp: float = None
@@ -24,9 +26,10 @@ class SttStatusMessage:
         return json.dumps(asdict(self), ensure_ascii=False)
 
     @classmethod
-    def from_json(cls, raw: str) -> 'SttStatusMessage':
+    def from_json(cls, raw: str) -> "SttStatusMessage":
         data = json.loads(raw)
         return cls(**data)
+
 
 class MessageType(Enum):
     REQUEST = auto()
@@ -65,17 +68,17 @@ class Message:
 
     def to_json(self) -> str:
         data = asdict(self)
-        data['msg_type'] = self.msg_type.name
+        data["msg_type"] = self.msg_type.name
         if self.command:
-            data['command'] = self.command.value
+            data["command"] = self.command.value
         return json.dumps(data, ensure_ascii=False)
 
     @classmethod
-    def from_json(cls, raw: str) -> 'Message':
+    def from_json(cls, raw: str) -> "Message":
         data = json.loads(raw)
-        data['msg_type'] = MessageType[data['msg_type']]
-        if data.get('command'):
-            data['command'] = Command(data['command'])
+        data["msg_type"] = MessageType[data["msg_type"]]
+        if data.get("command"):
+            data["command"] = Command(data["command"])
         return cls(**data)
 
     def __repr__(self) -> str:

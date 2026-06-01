@@ -2,13 +2,24 @@
 Settings window for the application.
 Reads/writes config.json and validates the structure via Pydantic before saving.
 """
+
 import json
 import shutil
 from pathlib import Path
 from typing import Optional
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QCheckBox, QPushButton, QMessageBox, QGroupBox, QTabWidget, QFileDialog, QComboBox
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QCheckBox,
+    QPushButton,
+    QMessageBox,
+    QGroupBox,
+    QTabWidget,
+    QFileDialog,
+    QComboBox,
 )
 from PySide6.QtCore import Signal, Qt
 import logging
@@ -98,7 +109,9 @@ class SettingsWindow(QWidget):
         br_grp_layout = QVBoxLayout()
 
         self.browser_choice_combo = QComboBox()
-        self.browser_choice_combo.addItems(["default", "yandex", "opera", "chrome", "edge", "custom"])
+        self.browser_choice_combo.addItems(
+            ["default", "yandex", "opera", "chrome", "edge", "custom"]
+        )
 
         self.custom_path_edit = QLineEdit()
         self.custom_path_edit.setEnabled(False)
@@ -120,7 +133,9 @@ class SettingsWindow(QWidget):
         br_engine_layout.addWidget(self.custom_engine_combo)
 
         self.custom_preset_combo = QComboBox()
-        self.custom_preset_combo.addItems(["", "google", "bing", "yandex", "duckduckgo"])
+        self.custom_preset_combo.addItems(
+            ["", "google", "bing", "yandex", "duckduckgo"]
+        )
         self.custom_preset_combo.setEnabled(False)
 
         br_preset_layout = QHBoxLayout()
@@ -210,7 +225,9 @@ class SettingsWindow(QWidget):
         # Connect UI logic
         self.script_dir_btn.clicked.connect(self._on_browse_script_dir)
         self.custom_path_browse.clicked.connect(self._on_browse_custom_browser)
-        self.browser_choice_combo.currentTextChanged.connect(self._on_browser_choice_changed)
+        self.browser_choice_combo.currentTextChanged.connect(
+            self._on_browser_choice_changed
+        )
         self._on_browser_choice_changed(self.browser_choice_combo.currentText())
 
     # ------------------------------------------------------------------
@@ -223,24 +240,36 @@ class SettingsWindow(QWidget):
             return None
         return path
 
-    def _validate_integer(self, text: str, field_name: str, min_val: int, max_val: int) -> Optional[int]:
+    def _validate_integer(
+        self, text: str, field_name: str, min_val: int, max_val: int
+    ) -> Optional[int]:
         try:
             val = int(text.strip())
             if not (min_val <= val <= max_val):
                 raise ValueError
             return val
         except ValueError:
-            QMessageBox.warning(self, "Input Error", f"{field_name} must be an integer between {min_val} and {max_val}.")
+            QMessageBox.warning(
+                self,
+                "Input Error",
+                f"{field_name} must be an integer between {min_val} and {max_val}.",
+            )
             return None
 
-    def _validate_float(self, text: str, field_name: str, min_val: float, max_val: float) -> Optional[float]:
+    def _validate_float(
+        self, text: str, field_name: str, min_val: float, max_val: float
+    ) -> Optional[float]:
         try:
             val = float(text.strip())
             if not (min_val <= val <= max_val):
                 raise ValueError
             return val
         except ValueError:
-            QMessageBox.warning(self, "Input Error", f"{field_name} must be a number between {min_val} and {max_val}.")
+            QMessageBox.warning(
+                self,
+                "Input Error",
+                f"{field_name} must be a number between {min_val} and {max_val}.",
+            )
             return None
 
     # ------------------------------------------------------------------
@@ -248,7 +277,9 @@ class SettingsWindow(QWidget):
     # ------------------------------------------------------------------
     def _load_from_file(self):
         if not self.config_path.exists():
-            QMessageBox.warning(self, "Error", f"Configuration file not found: {self.config_path}")
+            QMessageBox.warning(
+                self, "Error", f"Configuration file not found: {self.config_path}"
+            )
             return
 
         with open(self.config_path, "r", encoding="utf-8") as f:
@@ -260,7 +291,9 @@ class SettingsWindow(QWidget):
 
         # Script Runner
         sr = data.get("script_runner", {})
-        self.script_dir_edit.setText(str(sr.get("default_script_path") or sr.get("base_dir", "scripts")))
+        self.script_dir_edit.setText(
+            str(sr.get("default_script_path") or sr.get("base_dir", "scripts"))
+        )
         self.script_timeout_edit.setText(str(sr.get("timeout", 300)))
         self.script_async_cb.setChecked(sr.get("is_async", True))
         self.script_strict_cb.setChecked(sr.get("strict", False))
@@ -282,7 +315,9 @@ class SettingsWindow(QWidget):
 
         # AI & STT
         api = data.get("api", {})
-        self.api_base_url_edit.setText(api.get("base_url", "https://openrouter.ai/api/v1"))
+        self.api_base_url_edit.setText(
+            api.get("base_url", "https://openrouter.ai/api/v1")
+        )
         self.api_model_edit.setText(api.get("model", "openrouter/free"))
         self.api_token_edit.setText(api.get("token", ""))
         self.api_use_llm_cb.setChecked(data.get("use_llm_for_stt", False))
@@ -292,10 +327,14 @@ class SettingsWindow(QWidget):
 
         # System & Screen
         es = data.get("energy_saver", {})
-        self.energy_hz_edit.setText(str(es.get("enabled_lower_refresh_rate_hz_edit", 60)))
+        self.energy_hz_edit.setText(
+            str(es.get("enabled_lower_refresh_rate_hz_edit", 60))
+        )
 
         st = data.get("screen_tool", {})
-        self.fps_recording_edit.setText(str(st.get("fps") or st.get("fps_recording_edit", 20)))
+        self.fps_recording_edit.setText(
+            str(st.get("fps") or st.get("fps_recording_edit", 20))
+        )
 
     # ------------------------------------------------------------------
     # Data Saving
@@ -306,25 +345,42 @@ class SettingsWindow(QWidget):
 
         # 1. Validate Inputs
         dir_path = self._validate_path(self.script_dir_edit.text(), "Scripts Directory")
-        if dir_path is None: return
+        if dir_path is None:
+            return
 
-        timeout = self._validate_float(self.script_timeout_edit.text(), "Script Timeout", 1.0, 3600.0)
-        if timeout is None: return
+        timeout = self._validate_float(
+            self.script_timeout_edit.text(), "Script Timeout", 1.0, 3600.0
+        )
+        if timeout is None:
+            return
 
-        winget_to = self._validate_integer(self.winget_timeout_edit.text(), "Winget Timeout", 10, 600)
-        if winget_to is None: return
+        winget_to = self._validate_integer(
+            self.winget_timeout_edit.text(), "Winget Timeout", 10, 600
+        )
+        if winget_to is None:
+            return
 
-        uninstall_to = self._validate_integer(self.uninstall_timeout_edit.text(), "Uninstall Timeout", 10, 600)
-        if uninstall_to is None: return
+        uninstall_to = self._validate_integer(
+            self.uninstall_timeout_edit.text(), "Uninstall Timeout", 10, 600
+        )
+        if uninstall_to is None:
+            return
 
-        launch_wait = self._validate_float(self.launch_wait_edit.text(), "Launch Wait", 0.1, 30.0)
-        if launch_wait is None: return
+        launch_wait = self._validate_float(
+            self.launch_wait_edit.text(), "Launch Wait", 0.1, 30.0
+        )
+        if launch_wait is None:
+            return
 
         hz = self._validate_integer(self.energy_hz_edit.text(), "Refresh Rate", 30, 360)
-        if hz is None: return
+        if hz is None:
+            return
 
-        fps = self._validate_float(self.fps_recording_edit.text(), "Recording FPS", 10.0, 60.0)
-        if fps is None: return
+        fps = self._validate_float(
+            self.fps_recording_edit.text(), "Recording FPS", 10.0, 60.0
+        )
+        if fps is None:
+            return
 
         lang = self.stt_language_edit.text().strip()
         if not lang:
@@ -333,7 +389,9 @@ class SettingsWindow(QWidget):
 
         encoding = self.subprocess_encoding_edit.text().strip()
         if not encoding:
-            QMessageBox.warning(self, "Input Error", "Subprocess encoding cannot be empty.")
+            QMessageBox.warning(
+                self, "Input Error", "Subprocess encoding cannot be empty."
+            )
             return
 
         # 2. Build Dict (Pydantic-compatible structure)
@@ -341,7 +399,7 @@ class SettingsWindow(QWidget):
             "default_script_path": dir_path,
             "timeout": timeout,
             "is_async": self.script_async_cb.isChecked(),
-            "strict": self.script_strict_cb.isChecked()
+            "strict": self.script_strict_cb.isChecked(),
         }
 
         current["app_manager"] = {
@@ -349,21 +407,33 @@ class SettingsWindow(QWidget):
             "winget_timeout_s": winget_to,
             "uninstall_timeout_s": uninstall_to,
             "launch_wait_s": launch_wait,
-            "subprocess_encoding": encoding
+            "subprocess_encoding": encoding,
         }
 
         current["browser"] = {
             **current.get("browser", {}),
             "default_choice": self.browser_choice_combo.currentText(),
-            "custom_path": self.custom_path_edit.text().strip() if self.browser_choice_combo.currentText() == "custom" else "",
-            "custom_engine": self.custom_engine_combo.currentText() if self.browser_choice_combo.currentText() == "custom" else "chromium",
-            "custom_search_preset": self.custom_preset_combo.currentText() if self.browser_choice_combo.currentText() == "custom" else ""
+            "custom_path": (
+                self.custom_path_edit.text().strip()
+                if self.browser_choice_combo.currentText() == "custom"
+                else ""
+            ),
+            "custom_engine": (
+                self.custom_engine_combo.currentText()
+                if self.browser_choice_combo.currentText() == "custom"
+                else "chromium"
+            ),
+            "custom_search_preset": (
+                self.custom_preset_combo.currentText()
+                if self.browser_choice_combo.currentText() == "custom"
+                else ""
+            ),
         }
 
         current["api"] = {
             "base_url": self.api_base_url_edit.text().strip(),
             "model": self.api_model_edit.text().strip(),
-            "token": self.api_token_edit.text().strip()
+            "token": self.api_token_edit.text().strip(),
         }
         current["use_llm_for_stt"] = self.api_use_llm_cb.isChecked()
         current.setdefault("stt", {})
@@ -379,15 +449,21 @@ class SettingsWindow(QWidget):
         try:
             Settings.model_validate(current)
         except Exception as e:
-            QMessageBox.critical(self, "Validation Error", f"Invalid configuration:\n{str(e)}")
+            QMessageBox.critical(
+                self, "Validation Error", f"Invalid configuration:\n{str(e)}"
+            )
             return
 
         # 4. Write
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(current, f, indent=2, ensure_ascii=False)
 
-        QMessageBox.information(self, "Saved", "Settings saved successfully.\n"
-                                                         "Changes will take effect after restarting the application.")
+        QMessageBox.information(
+            self,
+            "Saved",
+            "Settings saved successfully.\n"
+            "Changes will take effect after restarting the application.",
+        )
         self.hide()
 
     # ------------------------------------------------------------------
@@ -396,17 +472,23 @@ class SettingsWindow(QWidget):
     def _on_reset_config(self):
         default_path = Path(__file__).parent / "default_config.json"
         if not default_path.exists():
-            QMessageBox.critical(self, "Error", "default_config.json not found in settings folder.")
+            QMessageBox.critical(
+                self, "Error", "default_config.json not found in settings folder."
+            )
             return
 
         reply = QMessageBox.question(
-            self, "Confirm Reset", "Reset all settings to default?",
+            self,
+            "Confirm Reset",
+            "Reset all settings to default?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
             shutil.copy2(default_path, self.config_path)
-            QMessageBox.information(self, "Success", "Config reset. UI updated. Restart recommended.")
+            QMessageBox.information(
+                self, "Success", "Config reset. UI updated. Restart recommended."
+            )
             self._load_from_file()
 
     def _on_browse_script_dir(self):
@@ -416,13 +498,16 @@ class SettingsWindow(QWidget):
 
     def _on_browse_custom_browser(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select Browser Executable", "", "Executable Files (*.exe);;All Files (*)"
+            self,
+            "Select Browser Executable",
+            "",
+            "Executable Files (*.exe);;All Files (*)",
         )
         if path:
             self.custom_path_edit.setText(path)
 
     def _on_browser_choice_changed(self, choice: str):
-        is_custom = (choice == "custom")
+        is_custom = choice == "custom"
         self.custom_path_edit.setEnabled(is_custom)
         self.custom_path_browse.setEnabled(is_custom)
         self.custom_engine_combo.setEnabled(is_custom)

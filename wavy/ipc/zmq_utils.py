@@ -1,6 +1,7 @@
 """
 ZMQ helpers with logging, timeouts, and error handling.
 """
+
 import zmq
 import logging
 import json
@@ -25,8 +26,9 @@ def bind_rep_socket(ctx: zmq.Context, port: int, logger_name: str) -> zmq.Socket
     return socket
 
 
-def connect_req_socket(ctx: zmq.Context, port: int, timeout_ms: int = 3000,
-                       logger_name: str = "ipc") -> zmq.Socket:
+def connect_req_socket(
+    ctx: zmq.Context, port: int, timeout_ms: int = 3000, logger_name: str = "ipc"
+) -> zmq.Socket:
     """Connect REQ socket for client-side with timeout."""
     socket = ctx.socket(zmq.REQ)
     socket.setsockopt(zmq.RCVTIMEO, timeout_ms)

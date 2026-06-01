@@ -2,6 +2,7 @@
 """
 Tray process: pystray icon + ZMQ client to GUI.
 """
+
 import threading
 import logging
 import time
@@ -21,15 +22,20 @@ import sys
 ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from ipc.protocol import Message, MessageType, Command
-from ipc.zmq_utils import create_context, connect_req_socket, send_message, recv_message
 
 # ===== Logging setup =====
 class ColoredFormatter(logging.Formatter):
-    COLORS = {"INFO": "\033[92m", "WARNING": "\033[93m", "ERROR": "\033[91m", "RESET": "\033[0m"}
+    COLORS = {
+        "INFO": "\033[92m",
+        "WARNING": "\033[93m",
+        "ERROR": "\033[91m",
+        "RESET": "\033[0m",
+    }
+
     def format(self, record):
         color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
         return f"{color}{super().format(record)}{self.COLORS['RESET']}"
+
 
 logger = logging.getLogger("tray")
 handler = logging.StreamHandler()
@@ -47,6 +53,7 @@ class AppState:
         self.lock_socket = None
         self.command_lock = threading.Lock()
 
+
 state = AppState()
 
 
@@ -57,7 +64,8 @@ def create_icon(color: str = "blue"):
     try:
         font = ImageFont.load_default()
         d.text((22, 15), "U", fill="black", font=font)
-    except: pass
+    except:
+        pass
     return img
 
 
@@ -73,7 +81,9 @@ def notify(title: str, message: str):
 def run_command(icon, name: str, command: str):
     with state.command_lock:
         if state.running_command:
-            notify("Команда уже выполняется", f"{state.running_command} ещё выполняется")
+            notify(
+                "Команда уже выполняется", f"{state.running_command} ещё выполняется"
+            )
             return
         state.running_command = name
 
@@ -83,13 +93,17 @@ def run_command(icon, name: str, command: str):
 
     def _worker():
         try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=60
+            )
             if result.returncode == 0:
                 icon.icon = create_icon("green")
                 notify(name, "Выполнено успешно")
             else:
                 icon.icon = create_icon("red")
-                notify(f"{name} - ошибка", result.stderr.strip() or "Неизвестная ошибка")
+                notify(
+                    f"{name} - ошибка", result.stderr.strip() or "Неизвестная ошибка"
+                )
         except Exception as e:
             icon.icon = create_icon("red")
             notify(f"{name} - ошибка", str(e))
@@ -126,7 +140,6 @@ def _send_gui_command(command: str, port: int = 5555, timeout_ms: int = 2000) ->
         ctx.term()
 
 
-
 def exit_app(icon, item):
     logger.info("Tray: Exit requested")
     if not _send_gui_command("shutdown"):
@@ -137,8 +150,10 @@ def exit_app(icon, item):
     if worker and worker.is_alive():
         worker.join(timeout=5)
     if state.lock_socket:
-        try: state.lock_socket.close()
-        except: pass
+        try:
+            state.lock_socket.close()
+        except:
+            pass
     icon.stop()
     logger.info("Tray: Exited cleanly")
 
@@ -149,10 +164,19 @@ def run_tray():
         create_icon("blue"),
         "UniversalApp",
         menu=pystray.Menu(
-            Item("Команда 1", lambda i, item: run_command(i, "Команда 1", "echo Команда 1")),
-            Item("Команда 2", lambda i, item: run_command(i, "Команда 2", "echo Команда 2")),
+            Item(
+                "Команда 1",
+                lambda i, item: run_command(i, "Команда 1", "echo Команда 1"),
+            ),
+            Item(
+                "Команда 2",
+                lambda i, item: run_command(i, "Команда 2", "echo Команда 2"),
+            ),
             Item("⚙ Настройки", lambda i, item: _send_gui_command("open_settings")),
-            Item("Выход", lambda i, item: (_send_gui_command("shutdown"), exit_app(i, item))),
+            Item(
+                "Выход",
+                lambda i, item: (_send_gui_command("shutdown"), exit_app(i, item)),
+            ),
         ),
     )
     state.icon = icon
@@ -172,19 +196,25 @@ if __name__ == "__main__":
     PORT = 65234
     try:
         import socket, ctypes
+
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(("127.0.0.2", PORT))
         state.lock_socket = s
     except OSError:
         logger.warning("Tray: Application already running!")
         try:
-            ctypes.windll.user32.MessageBoxW(0, "Приложение уже работает в трее.", "UniversalApp", 0x40)
-        except: pass
+            ctypes.windll.user32.MessageBoxW(
+                0, "Приложение уже работает в трее.", "UniversalApp", 0x40
+            )
+        except:
+            pass
         sys.exit(1)
 
     try:
         run_tray()
     finally:
         if state.lock_socket:
-            try: state.lock_socket.close()
-            except: pass
+            try:
+                state.lock_socket.close()
+            except:
+                pass
