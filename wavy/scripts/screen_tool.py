@@ -18,7 +18,7 @@ except Exception:
 
 class ScreenToolPaths:
     def __init__(self):
-        self.base_user_dir: Path = Path.home() / "ScreenTool"
+        self.base_user_dir: Path = Path.home() / "Desktop/ScreenTool"
         self.screenshots_dir_name: str = "screenshots"
         self.records_dir_name: str = "records"
         self.screenshot_prefix: str = "screenshot"
@@ -64,7 +64,7 @@ def timestamp() -> str:
 
 def take_screenshot() -> None:
     img = pyautogui.screenshot()
-    filename = Path.cwd() / f"{settings.paths.screenshot_prefix}_{timestamp()}.png"
+    filename = SCREENSHOTS_DIR / f"{settings.paths.screenshot_prefix}_{timestamp()}.png"
     img.save(filename)
     logger.info("Screenshot saved: %s", filename)
 
