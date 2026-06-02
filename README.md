@@ -1,7 +1,7 @@
 # WavyOS
 
 
-| ![mascot.png](./avatar/assets/avatar.png) | 
+| ![mascot.png](./wavy/avatar/assets/avatar.png) | 
 |:--:| 
 | *Wavy* |
 
