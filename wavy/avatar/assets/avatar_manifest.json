@@ -1,0 +1,82 @@
+{
+  "base": "BASE.png",
+  "layers_order": ["hairtie", "eyebrows", "eyes", "mouth"],
+  "frame_duration_seconds": 0.25,
+  "states": {
+    "idle": {
+      "layers": {
+        "hairtie": ["IDLE/IDLE_HAIRTIE.png"],
+        "eyebrows": ["IDLE/IDLE_EYEBROWS.png"],
+        "eyes": [
+          "IDLE/IDLE_EYES.png",
+          "IDLE/IDLE_EYES.png",
+          "IDLE/IDLE_EYES.png",
+          "IDLE/IDLE_EYES_CLOSE_1.png",
+          "IDLE/IDLE_EYES_CLOSE_2.png",
+          "IDLE/IDLE_EYES_CLOSE_1.png"
+        ],
+        "mouth": ["IDLE/IDLE_MOUTH.png"]
+      }
+    },
+    "listening": {
+      "layers": {
+        "hairtie": [
+          "LISTENING/LISTENING_HAIRTIE_0.png",
+          "LISTENING/LISTENING_HAIRTIE_1.png",
+          "LISTENING/LISTENING_HAIRTIE_2.png"
+        ],
+        "eyebrows": ["LISTENING/LISTENING_EYEBROWS.png"],
+        "eyes": ["LISTENING/LISTENING_EYES.png"],
+        "mouth": ["LISTENING/LISTENING_MOUTH.png"]
+      }
+    },
+    "thinking": {
+      "layers": {
+        "hairtie": [
+          "THINKING/THINKING_HAIRTIE_0.png",
+          "THINKING/THINKING_HAIRTIE_1.png",
+          "THINKING/THINKING_HAIRTIE_2.png"
+        ],
+        "eyebrows": ["THINKING/THINKING_EYEBROWS.png"],
+        "eyes": [
+          "THINKING/THINKING_EYES_0.png",
+          "THINKING/THINKING_EYES_1.png",
+          "THINKING/THINKING_EYES_2.png"
+        ],
+        "mouth": ["THINKING/THINKING_MOUTH.png"]
+      }
+    },
+    "executing": {
+      "layers": {
+        "hairtie": ["EXECUTING/EXECUTING_HAIRTIE.png"],
+        "eyebrows": ["EXECUTING/EXECUTING_EYEBROWS.png"],
+        "eyes": [
+          "EXECUTING/EXECUTING_EYES_1.png",
+          "EXECUTING/EXECUTING_EYES_2.png"
+        ],
+        "mouth": ["EXECUTING/EXECUTING_MOUTH.png"]
+      }
+    },
+    "speaking": {
+      "layers": {
+        "hairtie": ["SPEAKING/SPEAKING_HAIRTIE.png"],
+        "eyebrows": ["SPEAKING/SPEAKING_EYEBROWS.png"],
+        "eyes": ["SPEAKING/SPEAKING_EYES.png"],
+        "mouth": [
+          "SPEAKING/SPEAKING_MOUTH_0.png",
+          "SPEAKING/SPEAKING_MOUTH_1.png",
+          "SPEAKING/SPEAKING_MOUTH_2.png",
+          "SPEAKING/SPEAKING_MOUTH_3.png"
+        ]
+      }
+    },
+    "error": {
+      "layers": {
+        "hairtie": ["ERROR/ERROR_HAIRTIE.png"],
+        "eyebrows": ["ERROR/ERROR_EYEBROWS.png"],
+        "eyes": ["ERROR/ERROR_EYES.png"],
+        "mouth": ["ERROR/ERROR_MOUTH.png"]
+      }
+    }
+  }
+}

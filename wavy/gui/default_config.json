@@ -12,21 +12,21 @@
     "min_length_of_recording": 1.0,
     "pre_recording_buffer_duration": 0.2
   },
-  "use_llm_for_stt": false,
+  "use_llm_for_stt": true,
   "api": {
     "base_url": "https://openrouter.ai/api/v1",
-    "model": "openai/gpt-oss-120b",
-    "token": ""
+    "token": "",
+    "model": "openai/gpt-oss-120b"
   },
   "app_manager": {
-    "winget_timeout_s": 119,
+    "winget_timeout_s": 120,
     "uninstall_timeout_s": 120,
     "launch_wait_s": 1.0,
     "subprocess_encoding": "utf-8"
   },
   "script_runner": {
-    "default_script_path": "C:/Users/User/Desktop/",
-    "timeout": 300.0,
+    "base_dir": "C:/Users/User/Desktop/",
+    "timeout": 300,
     "is_async": true,
     "strict": false
   },
@@ -34,13 +34,13 @@
     "enabled_lower_refresh_rate_hz_edit": 60
   },
   "screen_tool": {
-    "fps_recording_edit": 20,
-    "fps": 20.0
+    "fps_recording_edit": 20
   },
   "browser": {
     "default_choice": "default",
     "custom_path": "",
     "custom_engine": "chromium",
-    "custom_search_preset": ""
+    "custom_search_preset": "google"
   }
+
 }

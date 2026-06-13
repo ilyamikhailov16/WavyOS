@@ -26,6 +26,9 @@ pip-wheel-metadata/
 .idea/
 .vscode/
 
+# GigaIDE
+.gigaide/
+
 # Windows
 Thumbs.db
 Desktop.ini
@@ -48,9 +51,11 @@ captures/
 videos/
 screenshots/
 screenshot_*.png
+stt_debug/
 *.avi
 *.mp4
 *.mkv
+avatar/previews/
 
 # Local browser / automation state
 user-data/
@@ -59,3 +64,6 @@ downloads/
 
 # API key
 token.txt
+
+# Models
+wavy/tts/models/*
